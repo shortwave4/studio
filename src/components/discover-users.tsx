@@ -74,33 +74,30 @@ export default function DiscoverUsers() {
       {users.map((user) => (
         <Card
           key={user.userId}
-          className="flex flex-col text-center shadow-lg hover:shadow-xl transition-shadow duration-300 bg-transparent border-none overflow-visible"
+          className="text-center shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-xl overflow-hidden bg-card"
         >
-          <div className="relative bg-gradient-animation rounded-t-lg h-24">
-            <div className='absolute -bottom-12 left-1/2 -translate-x-1/2'>
-              <Avatar className="w-24 h-24 border-4 border-background bg-background ring-2 ring-primary">
-                <AvatarImage
-                  src={`https://picsum.photos/seed/${user.userId}/200/200`}
-                  alt={user.name}
-                  data-ai-hint="person portrait"
-                />
-                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-              </Avatar>
-            </div>
+          <div className="relative h-24 bg-gradient-to-b from-primary/20 via-primary/5 to-transparent">
+             <div className='absolute -bottom-12 left-1/2 -translate-x-1/2'>
+                <Avatar className="w-24 h-24 border-4 border-card bg-background ring-1 ring-border">
+                    <AvatarImage
+                    src={`https://picsum.photos/seed/${user.userId}/200/200`}
+                    alt={user.name}
+                    data-ai-hint="person portrait"
+                    />
+                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+             </div>
           </div>
           
-          <div className="relative bg-background rounded-b-lg">
-             <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-transparent to-background -translate-y-full" />
-            <CardContent className="flex-grow pt-16">
-              <h3 className="font-headline text-xl font-bold">{user.name}</h3>
-              <p className="text-muted-foreground mt-2 text-sm">{user.bio}</p>
-            </CardContent>
-            <CardFooter className="p-6">
-              <Button className="w-full" variant="outline">
-                <MessageSquarePlus className="mr-2 h-4 w-4" /> Start Chat
-              </Button>
-            </CardFooter>
-          </div>
+          <CardContent className="pt-16 pb-6 px-6">
+            <h3 className="font-headline text-xl font-bold">{user.name}</h3>
+            <p className="text-muted-foreground mt-1 text-sm h-10">{user.bio}</p>
+          </CardContent>
+          <CardFooter className="px-6 pb-6">
+            <Button className="w-full" variant="outline">
+              <MessageSquarePlus className="mr-2 h-4 w-4" /> Start Chat
+            </Button>
+          </CardFooter>
         </Card>
       ))}
     </div>
