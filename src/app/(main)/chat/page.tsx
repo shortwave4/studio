@@ -27,14 +27,14 @@ type Message = {
   own: boolean;
 };
 
-const contacts: Contact[] = [
+const initialContacts: Contact[] = [
   { id: 1, name: "Alice", lastMessage: "See you tomorrow!", time: "10:42", unread: 2, avatar: "user1" },
   { id: 2, name: "Group Project", lastMessage: "Bob: I'll push the changes.", time: "09:15", unread: 0, avatar: "user2" },
   { id: 3, name: "Charlie", lastMessage: "Sounds good!", time: "Yesterday", unread: 0, avatar: "user3" },
   { id: 4, name: "Diana", lastMessage: "Photo", time: "Yesterday", unread: 0, avatar: "user4" },
 ];
 
-const messages: Record<string, Message[]> = {
+const initialMessages: Record<string, Message[]> = {
   "1": [
     { id: 1, sender: "Alice", text: "Hey! How's it going?", time: "10:30", own: false },
     { id: 2, sender: "You", text: "Pretty good, just working on the ConnectSphere app. You?", time: "10:31", own: true },
@@ -62,7 +62,30 @@ const messages: Record<string, Message[]> = {
 };
 
 export default function ChatPage() {
+  const [contacts] = useState<Contact[]>(initialContacts);
   const [selectedChat, setSelectedChat] = useState<Contact>(contacts[0]);
+  const [messages, setMessages] = useState(initialMessages);
+  const [newMessage, setNewMessage] = useState("");
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    const newMsg: Message = {
+      id: Date.now(),
+      sender: "You",
+      text: newMessage,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      own: true,
+    };
+
+    setMessages(prevMessages => ({
+      ...prevMessages,
+      [selectedChat.id]: [...(prevMessages[selectedChat.id] || []), newMsg]
+    }));
+
+    setNewMessage("");
+  };
 
   const currentMessages = messages[selectedChat.id] || [];
 
@@ -159,25 +182,28 @@ export default function ChatPage() {
 
           {/* Message Input */}
           <div className="p-4 border-t">
-            <div className="relative">
-              <Input placeholder="Type a message..." className="pr-28" />
+            <form onSubmit={handleSendMessage} className="relative">
+              <Input 
+                placeholder="Type a message..." 
+                className="pr-28"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+              />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" type="button">
                   <Paperclip className="w-5 h-5" />
                 </Button>
-                 <Button variant="ghost" size="icon">
+                 <Button variant="ghost" size="icon" type="button">
                   <Mic className="w-5 h-5" />
                 </Button>
-                <Button size="icon" className="bg-accent hover:bg-accent/90">
+                <Button size="icon" className="bg-accent hover:bg-accent/90" type="submit">
                   <SendHorizonal className="w-5 h-5" />
                 </Button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-    
