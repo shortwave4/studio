@@ -42,16 +42,16 @@ export default function StatusPage() {
       </ScrollArea>
       
       <div className="mt-12 flex items-center justify-center">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md bg-gradient-animation text-primary-foreground">
           <CardContent className="p-10 text-center">
              <div className="flex justify-center mb-4">
-                 <Avatar className="w-32 h-32 border-4 border-primary p-1">
+                 <Avatar className="w-32 h-32 border-4 border-primary-foreground p-1">
                     <AvatarImage src="https://picsum.photos/seed/user1/400" />
                     <AvatarFallback>A</AvatarFallback>
                 </Avatar>
              </div>
             <h3 className="text-2xl font-bold font-headline">Viewing Alice's Status</h3>
-            <p className="text-muted-foreground mt-2">Tap to view next. Updates disappear after 24 hours.</p>
+            <p className="text-primary-foreground/80 mt-2">Tap to view next. Updates disappear after 24 hours.</p>
           </CardContent>
         </Card>
       </div>
