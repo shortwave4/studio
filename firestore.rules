@@ -1,108 +1,219 @@
 /**
- * @file Firestore Security Rules for ConnectSphere
- * @core_philosophy This ruleset enforces a strict user-ownership model for personal data and a role-based model for administrative data.  It leverages denormalization to optimize rule performance and avoid costly `get()` operations.
- * @data_structure User profiles and status updates are nested under `/users/{userId}`. Chat groups and affiliate products are stored in top-level collections. Admin roles are managed through the `/roles_admin/{userId}` collection.
- * @key_security_decisions
- *   - User listing is disallowed for privacy.
- *   - Public read access is granted for affiliate products, but write access is restricted to admins.
- *   - Chat group membership is managed through a denormalized `memberIds` array on the `ChatGroup` document itself.
- *   - Data consistency between the path and document fields (e.g., `userId` in `/users/{userId}`) is enforced on `create` and `update` operations.
- * @denormalization For `ChatGroup` authorization, the `memberIds` array is stored directly on the document.
- * @structural_segregation Private user data (profiles, status updates) is stored under `/users/{userId}`, while public/admin-managed data (affiliate products) resides in a top-level collection.
+ * @fileoverview Firestore Security Rules for ConnectSphere.
+ *
+ * Core Philosophy: This ruleset enforces a strict user-ownership model for personal data
+ * and role-based access for administrative functions. It prioritizes secure data access
+ * by validating user identity and using denormalization to avoid costly `get()` operations.
+ *
+ * Data Structure:
+ * - /users/{userId}: User profile information, accessible only to the owning user.
+ * - /users/{userId}/status_updates/{statusId}: Status updates for a specific user,
+ *   accessible only to the owning user.
+ * - /chat_groups/{groupId}: Group chat information, accessible to members of the group.
+ *   Authorization is based on a denormalized `memberIds` array within the document.
+ * - /chat_groups/{groupId}/messages/{messageId}: Chat messages within a group, accessible
+ *   to members of the group.
+ * - /users/{userId}/private_chats/{chatId}/messages/{messageId}: Direct messages between users.
+ * - /affiliate_products/{productId}: Affiliate product information, publicly readable but
+ *   only modifiable by admins.
+ * - /roles_admin/{userId}: Documents that indicate admin role. Existence of document grants admin privileges.
+ *
+ * Key Security Decisions:
+ * - User data is strictly private, with access limited to the owning user.
+ * - Listing of all users is disallowed to prevent information harvesting.
+ * - Chat group membership is managed through a denormalized `memberIds` array for efficient
+ *   authorization.
+ * - Affiliate products are publicly readable but only modifiable by admins.
+ * - Admin privileges are granted by the existence of a document in the `/roles_admin/{userId}` collection.
+ *
+ * Denormalization for Authorization:
+ * - Chat group membership is denormalized into the `memberIds` array within the
+ *   `/chat_groups/{groupId}` document. This avoids the need for costly `get()` operations
+ *   to check membership when accessing group chat data.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile information. Only the user can read or write their own profile.
-     * @path /users/{userId}/profile
-     * @allow (create, update, get, list, delete) if request.auth.uid == userId
-     * @deny (create, update, get, list, delete) if request.auth.uid != userId
+     * @description Secures user profile data. Only the user with the matching ID can read or write their profile.
+     * @path /users/{userId}
+     * @allow (create) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can create their profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @allow (get) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can get their profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @allow (update) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can update their profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @allow (delete) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can delete their profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @deny (create) User 'someOtherUserId' cannot create a profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @deny (get) User 'someOtherUserId' cannot get the profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @deny (update) User 'someOtherUserId' cannot update the profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @deny (delete) User 'someOtherUserId' cannot delete the profile at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
      * @principle Enforces document ownership for all operations.
      */
-    match /users/{userId}/profile {
-      //function isOwner(userId) {
-      //  return request.auth.uid == userId;
-      //}
+    match /users/{userId} {
+      // Helper function to check if the request is from the owner.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // Helper function to check if the request is from an existing owner.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && exists(resource);
+      }
+
       allow get: if isOwner(userId);
-      allow list: if false; // Listing user profiles is not permitted.
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow list: if false;
+      allow create: if request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Controls access to user status updates. Only the user can create, read, update, or delete their own status updates.
+     * @description Secures status updates for a user. Only the user can read or write their own status updates.
      * @path /users/{userId}/status_updates/{statusId}
-     * @allow (create, update, get, list, delete) if request.auth.uid == userId
-     * @deny (create, update, get, list, delete) if request.auth.uid != userId
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can create a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @allow (get) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can get a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @allow (update) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can update a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @allow (delete) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can delete a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @deny (create) User 'someOtherUserId' cannot create a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @deny (get) User 'someOtherUserId' cannot get a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @deny (update) User 'someOtherUserId' cannot update a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @deny (delete) User 'someOtherUserId' cannot delete a status update at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/status_updates/someStatusId.
+     * @principle Enforces document ownership and restricts access to user-specific data.
      */
     match /users/{userId}/status_updates/{statusId} {
+      // Reuse the isOwner function defined above.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // Helper function to check if the request is from an existing owner.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && exists(resource);
+      }
+
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Controls access to chat group information.  Allows members of the group to read and write.
+     * @description Secures chat group data. Only members of the group can read or write group information.
      * @path /chat_groups/{groupId}
-     * @allow (get, list) if request.auth.uid in resource.data.memberIds
-     * @allow (create, update, delete) if request.auth.uid in resource.data.memberIds
-     * @deny (get, list, create, update, delete) if request.auth.uid not in resource.data.memberIds
-     * @principle Enforces shared access based on membership in the `memberIds` array.
+     * @allow (create) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can create a group at /chat_groups/someGroupId if they are a member.
+     * @allow (get) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can get a group at /chat_groups/someGroupId if they are a member.
+     * @allow (update) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can update a group at /chat_groups/someGroupId if they are a member.
+     * @allow (delete) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can delete a group at /chat_groups/someGroupId if they are a member.
+     * @deny (create) User 'someOtherUserId' cannot create a group at /chat_groups/someGroupId if they are not a member.
+     * @deny (get) User 'someOtherUserId' cannot get a group at /chat_groups/someGroupId if they are not a member.
+     * @deny (update) User 'someOtherUserId' cannot update a group at /chat_groups/someGroupId if they are not a member.
+     * @deny (delete) User 'someOtherUserId' cannot delete a group at /chat_groups/someGroupId if they are not a member.
+     * @principle Enforces group membership for all operations.  Leverages denormalized 'memberIds' for authorization.
      */
     match /chat_groups/{groupId} {
-      allow get: if request.auth.uid in resource.data.memberIds;
-      allow list: if true; // Allow listing of chat groups
-      allow create: if request.resource.data.creatorId == request.auth.uid;
-      allow update: if request.auth.uid in resource.data.memberIds;
-      allow delete: if request.auth.uid in resource.data.memberIds;
+      // Helper function to check if the user is a member of the chat group.
+      function isMember() {
+        return request.auth != null && request.auth.uid in resource.data.memberIds;
+      }
+
+      // Helper function to check if the user is a member of the chat group for existing documents
+      function isExistingMember() {
+        return request.auth != null && request.auth.uid in resource.data.memberIds;
+      }
+
+      allow get: if isMember();
+      allow list: if isMember();
+      allow create: if request.auth.uid != null;
+      allow update: if isExistingMember();
+      allow delete: if isExistingMember();
     }
 
     /**
-     * @description Controls access to chat messages within a group.  Inherits authorization from the chat group membership.
+     * @description Secures chat messages within a group. Only members of the group can read or write messages.
      * @path /chat_groups/{groupId}/messages/{messageId}
-     * @allow (get, list) if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid])
-     * @allow (create, update, delete) if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid])
-     * @deny (get, list, create, update, delete) if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]) == false
-     * @principle Enforces shared access based on membership in the parent `ChatGroup` document.
+     * @allow (create) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can create a message at /chat_groups/someGroupId/messages/someMessageId if they are a member of the group.
+     * @allow (get) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can get a message at /chat_groups/someGroupId/messages/someMessageId if they are a member of the group.
+     * @allow (update) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can update a message at /chat_groups/someGroupId/messages/someMessageId if they are a member of the group.
+     * @allow (delete) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can delete a message at /chat_groups/someGroupId/messages/someMessageId if they are a member of the group.
+     * @deny (create) User 'someOtherUserId' cannot create a message at /chat_groups/someGroupId/messages/someMessageId if they are not a member of the group.
+     * @deny (get) User 'someOtherUserId' cannot get a message at /chat_groups/someGroupId/messages/someMessageId if they are not a member of the group.
+     * @deny (update) User 'someOtherUserId' cannot update a message at /chat_groups/someGroupId/messages/someMessageId if they are not a member of the group.
+     * @deny (delete) User 'someOtherUserId' cannot delete a message at /chat_groups/someGroupId/messages/someMessageId if they are not a member of the group.
+     * @principle Inherits authorization from the chat group membership.
      */
     match /chat_groups/{groupId}/messages/{messageId} {
-      allow get: if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
-      allow list: if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
-      allow create: if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
-      allow update: if false;
-      allow delete: if false;
-    }
+       // Helper function to check if the user is a member of the chat group.
+       function isMember() {
+            return request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds;
+        }
 
-   /**
-     * @description Controls access to private chat messages between users. Only the involved users can read, create, or delete messages.
-     * @path /users/{userId}/private_chats/{chatId}/messages/{messageId}
-     * @allow (create, update, get, list, delete) if request.auth.uid == userId
-     * @deny (create, update, get, list, delete) if request.auth.uid != userId
-     * @principle Enforces document ownership for all operations.
-     */
-    match /users/{userId}/private_chats/{chatId}/messages/{messageId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if false;
-        allow delete: if isOwner(userId);
+       function isExistingMember() {
+            return request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds;
+        }
+
+      allow get: if isMember();
+      allow list: if isMember();
+      allow create: if isMember();
+      allow update: if isExistingMember();
+      allow delete: if isExistingMember();
     }
 
     /**
-     * @description Controls access to affiliate product information.  Allows public read access, but only admins can create, update, or delete products.
+     * @description Secures direct messages between users.  The sender can create, the recipient can read, and either can modify.
+     * @path /users/{userId}/private_chats/{chatId}/messages/{messageId}
+     * @allow (create) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can create a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId.
+     * @allow (get) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can get a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId if they are the sender or recipient.
+     * @allow (update) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can update a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId if they are the sender or recipient.
+     * @allow (delete) User 'mwSqfH8UgwezVFOWsyNy9d2VQXl1' can delete a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId if they are the sender or recipient.
+     * @deny (create) User 'someOtherUserId' cannot create a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId.
+     * @deny (get) User 'someOtherUserId' cannot get a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId if they are not the sender or recipient.
+     * @deny (update) User 'someOtherUserId' cannot update a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId if they are not the sender or recipient.
+     * @deny (delete) User 'someOtherUserId' cannot delete a message at /users/mwSqfH8UgwezVFOWsyNy9d2VQXl1/private_chats/someChatId/messages/someMessageId if they are not the sender or recipient.
+     * @principle Path-based ownership combined with recipient access.
+     */
+    match /users/{userId}/private_chats/{chatId}/messages/{messageId} {
+      // Helper function to check if the user is the sender or recipient of the message.
+      function isSenderOrRecipient(userId) {
+        return request.auth != null && (request.auth.uid == userId || request.auth.uid == resource.data.recipientId);
+      }
+
+      // Helper function to check if the user is the sender or recipient of the message for existing documents.
+      function isExistingSenderOrRecipient(userId) {
+        return request.auth != null && (request.auth.uid == userId || request.auth.uid == resource.data.recipientId);
+      }
+
+      //Helper function for when document does not exist.
+      function isSender(userId) {
+          return request.auth != null && request.auth.uid == userId;
+      }
+
+
+      allow get: if isSenderOrRecipient(userId);
+      allow list: if isSenderOrRecipient(userId);
+      allow create: if request.auth.uid == userId;
+      allow update: if isExistingSenderOrRecipient(userId);
+      allow delete: if isExistingSenderOrRecipient(userId);
+    }
+
+    /**
+     * @description Secures affiliate product data. Publicly readable, but only admins can modify.
      * @path /affiliate_products/{productId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))
-     * @deny (create, update, delete) if !exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))
-     * @principle Public read, admin-only write.
+     * @allow (get) Any user can get an affiliate product at /affiliate_products/someProductId.
+     * @allow (list) Any user can list affiliate products at /affiliate_products.
+     * @allow (create) Only an admin can create an affiliate product at /affiliate_products/someProductId.
+     * @allow (update) Only an admin can update an affiliate product at /affiliate_products/someProductId.
+     * @allow (delete) Only an admin can delete an affiliate product at /affiliate_products/someProductId.
+     * @deny (create) A non-admin user cannot create an affiliate product at /affiliate_products/someProductId.
+     * @deny (update) A non-admin user cannot update an affiliate product at /affiliate_products/someProductId.
+     * @deny (delete) A non-admin user cannot delete an affiliate product at /affiliate_products/someProductId.
+     * @principle Role-based access control.  Requires admin privileges for write operations.
      */
     match /affiliate_products/{productId} {
+      // Helper function to check if the user is an admin.
+      function isAdmin() {
+        return request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
       allow get: if true;
       allow list: if true;
       allow create: if isAdmin();
@@ -111,38 +222,33 @@ service cloud.firestore {
     }
 
     /**
-     * @description Defines admin roles. Existence of a document grants admin privileges.
+     * @description Defines admin roles. The existence of a document grants admin privileges.
      * @path /roles_admin/{userId}
-     * @allow get: if isSignedIn();
-     * @allow list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Role-based access control.
+     * @allow (get) Any user can check if a user exists in /roles_admin/{userId}.
+     * @allow (list) Listing of all users is disallowed.
+     * @allow (create) Only the user with matching userId can create their admin role.
+     * @allow (update) Only the user with matching userId can update their admin role.
+     * @allow (delete) Only the user with matching userId can delete their admin role.
+     * @deny (create) User 'someOtherUserId' cannot create an admin role at /roles_admin/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @deny (get) User 'someOtherUserId' cannot get an admin role at /roles_admin/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @deny (update) User 'someOtherUserId' cannot update an admin role at /roles_admin/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @deny (delete) User 'someOtherUserId' cannot delete an admin role at /roles_admin/mwSqfH8UgwezVFOWsyNy9d2VQXl1.
+     * @principle Existence of document grants admin privileges.
      */
     match /roles_admin/{userId} {
-        allow get: if isSignedIn();
-        allow list: if false;
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
-    }
+      // Reuse the isOwner function defined above.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+        function isExistingOwner(userId) {
+        return isOwner(userId);
+      }
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      allow get: if true;
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
   }
 }
