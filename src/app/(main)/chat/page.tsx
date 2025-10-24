@@ -1,3 +1,7 @@
+
+"use client";
+
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,15 +10,32 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Search, Paperclip, Mic, SendHorizonal } from "lucide-react";
 
-export default function ChatPage() {
-  const contacts = [
-    { id: 1, name: "Alice", lastMessage: "See you tomorrow!", time: "10:42", unread: 2, avatar: "user1" },
-    { id: 2, name: "Group Project", lastMessage: "Bob: I'll push the changes.", time: "09:15", unread: 0, avatar: "user2" },
-    { id: 3, name: "Charlie", lastMessage: "Sounds good!", time: "Yesterday", unread: 0, avatar: "user3" },
-    { id: 4, name: "Diana", lastMessage: "Photo", time: "Yesterday", unread: 0, avatar: "user4" },
-  ];
+type Contact = {
+  id: number;
+  name: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  avatar: string;
+};
 
-  const messages = [
+type Message = {
+  id: number;
+  sender: string;
+  text: string;
+  time: string;
+  own: boolean;
+};
+
+const contacts: Contact[] = [
+  { id: 1, name: "Alice", lastMessage: "See you tomorrow!", time: "10:42", unread: 2, avatar: "user1" },
+  { id: 2, name: "Group Project", lastMessage: "Bob: I'll push the changes.", time: "09:15", unread: 0, avatar: "user2" },
+  { id: 3, name: "Charlie", lastMessage: "Sounds good!", time: "Yesterday", unread: 0, avatar: "user3" },
+  { id: 4, name: "Diana", lastMessage: "Photo", time: "Yesterday", unread: 0, avatar: "user4" },
+];
+
+const messages: Record<string, Message[]> = {
+  "1": [
     { id: 1, sender: "Alice", text: "Hey! How's it going?", time: "10:30", own: false },
     { id: 2, sender: "You", text: "Pretty good, just working on the ConnectSphere app. You?", time: "10:31", own: true },
     { id: 3, sender: "Alice", text: "Nice! I'm just chilling. Btw, did you see that new affiliate product?", time: "10:32", own: false },
@@ -22,11 +43,32 @@ export default function ChatPage() {
     { id: 5, sender: "You", text: "Yeah, the admin just added it. The link button is a nice touch.", time: "10:35", own: true },
     { id: 6, sender: "Alice", text: "Totally. Let's catch up later!", time: "10:40", own: false },
     { id: 7, sender: "You", text: "See you tomorrow!", time: "10:42", own: true },
-  ];
+  ],
+  "2": [
+      { id: 1, sender: "Bob", text: "Alright team, let's sync up on the project.", time: "09:00", own: false },
+      { id: 2, sender: "You", text: "Sounds good. I'm almost done with my part.", time: "09:01", own: true },
+      { id: 3, sender: "Alice", text: "I've finished the designs, will upload them now.", time: "09:05", own: false },
+      { id: 4, sender: "Bob", text: "Great! I'll push the latest backend changes.", time: "09:15", own: false },
+  ],
+  "3": [
+      { id: 1, sender: "Charlie", text: "Hey, are we still on for lunch?", time: "Yesterday", own: false },
+      { id: 2, sender: "You", text: "Yep! 1pm at the usual spot.", time: "Yesterday", own: true },
+      { id: 3, sender: "Charlie", text: "Sounds good!", time: "Yesterday", own: false },
+  ],
+  "4": [
+      { id: 1, sender: "Diana", text: "Check out this photo from my trip!", time: "Yesterday", own: false },
+      { id: 2, sender: "You", text: "Wow, that looks incredible!", time: "Yesterday", own: true },
+  ]
+};
+
+export default function ChatPage() {
+  const [selectedChat, setSelectedChat] = useState<Contact>(contacts[0]);
+
+  const currentMessages = messages[selectedChat.id] || [];
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col">
-      <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden">
+      <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass">
         {/* Contacts List */}
         <div className="flex flex-col border-r bg-muted/20">
           <div className="p-4">
@@ -38,13 +80,14 @@ export default function ChatPage() {
           </div>
           <Separator />
           <ScrollArea className="flex-grow">
-            {contacts.map((contact, index) => (
+            {contacts.map((contact) => (
               <div
                 key={contact.id}
                 className={cn(
                   "flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50",
-                  index === 0 && "bg-accent/80"
+                  selectedChat.id === contact.id && "bg-accent/80"
                 )}
+                onClick={() => setSelectedChat(contact)}
               >
                 <Avatar>
                   <AvatarImage src={`https://picsum.photos/seed/${contact.avatar}/200`} />
@@ -72,19 +115,19 @@ export default function ChatPage() {
           {/* Chat Header */}
           <div className="flex items-center p-3 border-b">
             <Avatar>
-              <AvatarImage src="https://picsum.photos/seed/user1/200" />
-              <AvatarFallback>A</AvatarFallback>
+              <AvatarImage src={`https://picsum.photos/seed/${selectedChat.avatar}/200`} />
+              <AvatarFallback>{selectedChat.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="ml-4">
-              <p className="font-semibold text-lg font-headline">Alice</p>
+              <p className="font-semibold text-lg font-headline">{selectedChat.name}</p>
               <p className="text-sm text-muted-foreground">Online</p>
             </div>
           </div>
 
           {/* Messages */}
-          <ScrollArea className="flex-grow p-4 bg-background">
+          <ScrollArea className="flex-grow p-4 bg-background/30">
             <div className="flex flex-col gap-4">
-              {messages.map((msg) => (
+              {currentMessages.map((msg) => (
                 <div
                   key={msg.id}
                   className={cn(
@@ -93,7 +136,7 @@ export default function ChatPage() {
                   )}
                 >
                   <Avatar className="w-8 h-8">
-                     <AvatarImage src={`https://picsum.photos/seed/${msg.own ? 'user-avatar' : 'user1'}/200`} />
+                     <AvatarImage src={`https://picsum.photos/seed/${msg.own ? 'user-avatar' : selectedChat.avatar}/200`} />
                      <AvatarFallback>{msg.sender.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
@@ -136,3 +179,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
