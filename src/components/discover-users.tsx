@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { getSuggestedUsers } from '@/lib/actions';
 import type { UserProfile } from '@/types';
 import {
@@ -18,6 +19,7 @@ export default function DiscoverUsers() {
   const [users, setUsers] = React.useState<UserProfile[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const router = useRouter();
 
   React.useEffect(() => {
     async function fetchUsers() {
@@ -42,6 +44,10 @@ export default function DiscoverUsers() {
 
     fetchUsers();
   }, []);
+
+  const handleStartChat = () => {
+    router.push('/chat');
+  };
 
   if (loading) {
     return (
@@ -94,7 +100,7 @@ export default function DiscoverUsers() {
             <p className="text-muted-foreground mt-1 text-sm h-10">{user.bio}</p>
           </CardContent>
           <CardFooter className="px-6 pb-6">
-            <Button className="w-full" variant="outline">
+            <Button className="w-full" variant="outline" onClick={handleStartChat}>
               <MessageSquarePlus className="mr-2 h-4 w-4" /> Start Chat
             </Button>
           </CardFooter>
