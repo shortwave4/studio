@@ -45,9 +45,7 @@
       "required": [
         "id",
         "name",
-        "email",
-        "phoneNumber",
-        "location"
+        "email"
       ]
     },
     "ChatMessage": {
@@ -224,14 +222,13 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}/profile",
+        "path": "/users/{userId}",
         "definition": {
           "entityName": "UserProfile",
           "schema": {

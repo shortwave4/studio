@@ -22,7 +22,7 @@ export function MainNav() {
   const pathname = usePathname();
 
   const menuItems = [
-    { href: "/", label: "Discover", icon: Users },
+    { href: "/discover", label: "Discover", icon: Users },
     { href: "/chat", label: "Chat", icon: MessageSquare },
     { href: "/status", label: "Status", icon: ImageIcon },
     { href: "/products", label: "Products", icon: ShoppingBag },
