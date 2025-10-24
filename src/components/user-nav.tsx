@@ -34,6 +34,9 @@ export function UserNav() {
   const getInitials = (name?: string | null) => {
     if (!name) return "";
     const nameParts = name.split(" ");
+    if (nameParts.length === 1 && nameParts[0].length > 1) {
+      return nameParts[0].substring(0, 2).toUpperCase();
+    }
     return nameParts.map((part) => part[0]).join("").toUpperCase();
   };
 
@@ -50,7 +53,7 @@ export function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.displayName}</p>
+            <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>

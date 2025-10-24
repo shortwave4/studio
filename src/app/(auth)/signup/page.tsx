@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { updateProfile } from "firebase/auth";
+import { doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,9 +25,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/firebase";
+import { useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase";
 import { initiateEmailSignUp } from "@/firebase/non-blocking-login";
 import { Flame } from "lucide-react";
+import { UserCredential } from "firebase/auth";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -36,6 +38,7 @@ const formSchema = z.object({
 
 export default function SignupPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -48,11 +51,29 @@ export default function SignupPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    await initiateEmailSignUp(auth, values.email, values.password);
-    if (auth.currentUser) {
-        await updateProfile(auth.currentUser, { displayName: values.name });
+    // We are not using the non-blocking version here because we need the user object
+    // to update the profile and create the firestore document.
+    try {
+      const userCredential: UserCredential | undefined = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      if (userCredential?.user) {
+        await updateProfile(userCredential.user, { displayName: values.name });
+
+        // Save user profile to Firestore
+        const userRef = doc(firestore, "users", userCredential.user.uid);
+        const userProfile = {
+          id: userCredential.user.uid,
+          name: values.name,
+          email: values.email,
+        };
+        // Use non-blocking write to firestore
+        setDocumentNonBlocking(userRef, userProfile, { merge: true });
+
+        router.push('/');
+      }
+    } catch (error) {
+      console.error("Signup failed:", error);
+      // You might want to show an error to the user here
     }
-    router.push('/');
   }
 
   return (
