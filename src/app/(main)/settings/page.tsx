@@ -1,12 +1,68 @@
+
+"use client";
+
+import { useState, useEffect } from "react";
+import { useUser, useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase";
+import { updateProfile } from "firebase/auth";
+import { doc } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
+  const { user } = useUser();
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      setName(user.displayName || "");
+      // In a real app, you'd fetch the bio from their Firestore profile
+      // For now, we'll use a placeholder.
+      setBio("Loves hiking and photography.");
+    }
+  }, [user]);
+
+  const handleSaveChanges = async () => {
+    if (!user || !auth.currentUser) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "You must be logged in to save changes.",
+      });
+      return;
+    }
+
+    try {
+      // Update display name in Firebase Auth
+      await updateProfile(auth.currentUser, { displayName: name });
+
+      // Update bio in Firestore (non-blocking)
+      const userRef = doc(firestore, "users", user.uid);
+      setDocumentNonBlocking(userRef, { bio: bio }, { merge: true });
+
+      toast({
+        title: "Success!",
+        description: "Your profile has been updated.",
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Could not save your profile. Please try again.",
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto max-w-3xl">
       <div className="mb-8">
@@ -26,15 +82,28 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" defaultValue="Your Name" />
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue="user@example.com" disabled />
+              <Input
+                id="email"
+                type="email"
+                value={user?.email || ""}
+                disabled
+              />
             </div>
              <div className="space-y-2">
               <Label htmlFor="bio">Bio</Label>
-              <Input id="bio" defaultValue="Loves hiking and photography." />
+              <Input
+                id="bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -89,7 +158,7 @@ export default function SettingsPage() {
         </Card>
 
         <div className="flex justify-end">
-            <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            <Button onClick={handleSaveChanges} className="bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
         </div>
       </div>
     </div>
