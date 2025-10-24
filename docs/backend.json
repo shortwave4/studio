@@ -1,0 +1,364 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile information.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User's phone number."
+        },
+        "location": {
+          "type": "string",
+          "description": "User's location (e.g., city, country)."
+        },
+        "profilePictureUrl": {
+          "type": "string",
+          "description": "URL of the user's profile picture.",
+          "format": "uri"
+        },
+        "bio": {
+          "type": "string",
+          "description": "User's biography or short description."
+        },
+        "lastActive": {
+          "type": "string",
+          "description": "Timestamp of the user's last activity.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "phoneNumber",
+        "location"
+      ]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single chat message.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the chat message."
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N ChatMessage). The ID of the user who sent the message."
+        },
+        "recipientId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N ChatMessage). The ID of the user who received the message (for one-to-one chats) or null (for group chats)."
+        },
+        "groupId": {
+          "type": "string",
+          "description": "Reference to ChatGroup. (Relationship: ChatGroup 1:N ChatMessage). The ID of the group chat this message belongs to, or null if it's a one-to-one chat."
+        },
+        "message": {
+          "type": "string",
+          "description": "The content of the message."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the message was sent.",
+          "format": "date-time"
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "URL of any media attached to the message (image, video, file), or null if no media."
+        },
+        "messageType": {
+          "type": "string",
+          "description": "Type of message: text, image, video, file, link."
+        }
+      },
+      "required": [
+        "id",
+        "senderId",
+        "message",
+        "timestamp",
+        "messageType"
+      ]
+    },
+    "ChatGroup": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatGroup",
+      "type": "object",
+      "description": "Represents a group chat.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the chat group."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the chat group."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the chat group."
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N ChatGroup). The ID of the user who created the group."
+        },
+        "memberIds": {
+          "type": "array",
+          "description": "References to UserProfiles. (Relationship: ChatGroup N:N UserProfile). An array of user IDs who are members of the group.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of when the group was created.",
+          "format": "date-time"
+        },
+        "groupPictureUrl": {
+          "type": "string",
+          "description": "URL of the group's picture.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "creatorId",
+        "memberIds",
+        "createdAt"
+      ]
+    },
+    "StatusUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StatusUpdate",
+      "type": "object",
+      "description": "Represents a user's status update.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the status update."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N StatusUpdate). The ID of the user who posted the status."
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "URL of the media attached to the status update (image, video)."
+        },
+        "text": {
+          "type": "string",
+          "description": "Optional text accompanying the status update."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the status update was posted.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "mediaUrl",
+        "timestamp"
+      ]
+    },
+    "AffiliateProduct": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AffiliateProduct",
+      "type": "object",
+      "description": "Represents an affiliate product.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the affiliate product."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the product."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the product's image."
+        },
+        "affiliateLink": {
+          "type": "string",
+          "description": "Affiliate link for the product."
+        },
+        "adminId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N AffiliateProduct). The ID of the admin who added the product."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "imageUrl",
+        "affiliateLink",
+        "adminId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}/profile",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profile information. Path-based ownership ensures only the user can read/write their profile.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/status_updates/{statusId}",
+        "definition": {
+          "entityName": "StatusUpdate",
+          "schema": {
+            "$ref": "#/backend/entities/StatusUpdate"
+          },
+          "description": "Stores status updates for a user. Path-based ownership. Status updates automatically delete after 24 hours (handled by a backend process or Cloud Function).",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who posted the status."
+            },
+            {
+              "name": "statusId",
+              "description": "The unique identifier of the status update."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/chat_groups/{groupId}",
+        "definition": {
+          "entityName": "ChatGroup",
+          "schema": {
+            "$ref": "#/backend/entities/ChatGroup"
+          },
+          "description": "Stores group chat information. Includes denormalized 'memberIds' array for authorization independence.",
+          "params": [
+            {
+              "name": "groupId",
+              "description": "The unique identifier of the chat group."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/chat_groups/{groupId}/messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores chat messages for a specific group.  Inherits authorization from the chat group membership. No additional denormalization is needed as group membership is checked at the group level.",
+          "params": [
+            {
+              "name": "groupId",
+              "description": "The unique identifier of the chat group."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier of the chat message."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/private_chats/{chatId}/messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores direct messages between users. Path-based ownership; `userId` owns the chat, and the other user (`recipientId`) implicitly has access.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who initiated the chat."
+            },
+            {
+              "name": "chatId",
+              "description": "The unique identifier of the private chat."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier of the chat message."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/affiliate_products/{productId}",
+        "definition": {
+          "entityName": "AffiliateProduct",
+          "schema": {
+            "$ref": "#/backend/entities/AffiliateProduct"
+          },
+          "description": "Stores information about affiliate products. Global read access, but only admins (defined in `/roles_admin/{uid}`) can create/update.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier of the affiliate product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Indicates admin role. Existence of document grants admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the admin user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore data structure is designed to support ConnectSphere's features (chat, status, profiles, affiliate products, location-based suggestions) while adhering to the core design principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs.  \n\n**Authorization Independence:** Achieved by denormalizing authorization data. For example, the `ChatGroup` documents would contain a `members` map rather than relying on a separate subcollection or document lookup.  This allows rules to validate membership without costly `get()` operations.\n\n**Structural Segregation:** Different data types with different access requirements are stored in separate collections. User profiles are stored under `/users/{userId}` for private data, while affiliate products are stored in `/affiliate_products` for admin management.\n\n**Access Modeling:** Path-based ownership is used for user-owned data like profiles (`/users/{userId}/profile`). Collaborative data (chat groups) uses the membership map model (`members: {uid: role}`). Affiliate products are globally accessible but only creatable/editable by admins (determined by checking for the existence of `/roles_admin/{uid}`).\n\n**QAPs Support:** Secure `list` operations are supported by avoiding rules that filter data based on document content. Instead, we use structural segregation. For example listing chat messages within a chat group does not require any filtering based on the current user. The rules simply check if the user is a member of the group (via the denormalized members map). Also, affiliate products are stored in their own collection and thus listing all products is allowed.\n\n**Realtime Database Considerations:** The prompt requested Firebase Realtime Database.  While this structure is optimized for Firestore, similar principles could be applied to Realtime Database. However, authorization in Realtime Database typically involves custom claims, which this design avoids.\n\n**Cloudinary and Firebase Storage:** The data structure supports storing media URLs, allowing links to both Cloudinary (for chat) and Firebase Storage (for status)."
+  }
+}

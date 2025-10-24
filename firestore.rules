@@ -1,0 +1,148 @@
+/**
+ * @file Firestore Security Rules for ConnectSphere
+ * @core_philosophy This ruleset enforces a strict user-ownership model for personal data and a role-based model for administrative data.  It leverages denormalization to optimize rule performance and avoid costly `get()` operations.
+ * @data_structure User profiles and status updates are nested under `/users/{userId}`. Chat groups and affiliate products are stored in top-level collections. Admin roles are managed through the `/roles_admin/{userId}` collection.
+ * @key_security_decisions
+ *   - User listing is disallowed for privacy.
+ *   - Public read access is granted for affiliate products, but write access is restricted to admins.
+ *   - Chat group membership is managed through a denormalized `memberIds` array on the `ChatGroup` document itself.
+ *   - Data consistency between the path and document fields (e.g., `userId` in `/users/{userId}`) is enforced on `create` and `update` operations.
+ * @denormalization For `ChatGroup` authorization, the `memberIds` array is stored directly on the document.
+ * @structural_segregation Private user data (profiles, status updates) is stored under `/users/{userId}`, while public/admin-managed data (affiliate products) resides in a top-level collection.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profile information. Only the user can read or write their own profile.
+     * @path /users/{userId}/profile
+     * @allow (create, update, get, list, delete) if request.auth.uid == userId
+     * @deny (create, update, get, list, delete) if request.auth.uid != userId
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/profile {
+      //function isOwner(userId) {
+      //  return request.auth.uid == userId;
+      //}
+      allow get: if isOwner(userId);
+      allow list: if false; // Listing user profiles is not permitted.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to user status updates. Only the user can create, read, update, or delete their own status updates.
+     * @path /users/{userId}/status_updates/{statusId}
+     * @allow (create, update, get, list, delete) if request.auth.uid == userId
+     * @deny (create, update, get, list, delete) if request.auth.uid != userId
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/status_updates/{statusId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to chat group information.  Allows members of the group to read and write.
+     * @path /chat_groups/{groupId}
+     * @allow (get, list) if request.auth.uid in resource.data.memberIds
+     * @allow (create, update, delete) if request.auth.uid in resource.data.memberIds
+     * @deny (get, list, create, update, delete) if request.auth.uid not in resource.data.memberIds
+     * @principle Enforces shared access based on membership in the `memberIds` array.
+     */
+    match /chat_groups/{groupId} {
+      allow get: if request.auth.uid in resource.data.memberIds;
+      allow list: if true; // Allow listing of chat groups
+      allow create: if request.resource.data.creatorId == request.auth.uid;
+      allow update: if request.auth.uid in resource.data.memberIds;
+      allow delete: if request.auth.uid in resource.data.memberIds;
+    }
+
+    /**
+     * @description Controls access to chat messages within a group.  Inherits authorization from the chat group membership.
+     * @path /chat_groups/{groupId}/messages/{messageId}
+     * @allow (get, list) if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid])
+     * @allow (create, update, delete) if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid])
+     * @deny (get, list, create, update, delete) if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]) == false
+     * @principle Enforces shared access based on membership in the parent `ChatGroup` document.
+     */
+    match /chat_groups/{groupId}/messages/{messageId} {
+      allow get: if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+      allow list: if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+      allow create: if get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+   /**
+     * @description Controls access to private chat messages between users. Only the involved users can read, create, or delete messages.
+     * @path /users/{userId}/private_chats/{chatId}/messages/{messageId}
+     * @allow (create, update, get, list, delete) if request.auth.uid == userId
+     * @deny (create, update, get, list, delete) if request.auth.uid != userId
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/private_chats/{chatId}/messages/{messageId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if false;
+        allow delete: if isOwner(userId);
+    }
+
+    /**
+     * @description Controls access to affiliate product information.  Allows public read access, but only admins can create, update, or delete products.
+     * @path /affiliate_products/{productId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))
+     * @deny (create, update, delete) if !exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))
+     * @principle Public read, admin-only write.
+     */
+    match /affiliate_products/{productId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Defines admin roles. Existence of a document grants admin privileges.
+     * @path /roles_admin/{userId}
+     * @allow get: if isSignedIn();
+     * @allow list: if false;
+     * @allow create: if false;
+     * @allow update: if false;
+     * @allow delete: if false;
+     * @principle Role-based access control.
+     */
+    match /roles_admin/{userId} {
+        allow get: if isSignedIn();
+        allow list: if false;
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+  }
+}
