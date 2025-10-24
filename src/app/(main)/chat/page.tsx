@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -8,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { Search, Paperclip, Mic, SendHorizonal } from "lucide-react";
+import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Contact = {
   id: number;
@@ -62,14 +62,19 @@ const initialMessages: Record<string, Message[]> = {
 };
 
 export default function ChatPage() {
+  const isMobile = useIsMobile();
   const [contacts] = useState<Contact[]>(initialContacts);
-  const [selectedChat, setSelectedChat] = useState<Contact>(contacts[0]);
+  const [selectedChat, setSelectedChat] = useState<Contact | null>(isMobile ? null : contacts[0]);
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState("");
 
+  const handleSelectChat = (contact: Contact) => {
+    setSelectedChat(contact);
+  };
+  
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !selectedChat) return;
 
     const newMsg: Message = {
       id: Date.now(),
@@ -87,122 +92,136 @@ export default function ChatPage() {
     setNewMessage("");
   };
 
-  const currentMessages = messages[selectedChat.id] || [];
+  const ChatList = (
+    <div className="flex flex-col border-r bg-muted/20 h-full">
+      <div className="p-4">
+        <h1 className="text-2xl font-bold font-headline">Chats</h1>
+        <div className="relative mt-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search chats..." className="pl-10" />
+        </div>
+      </div>
+      <Separator />
+      <ScrollArea className="flex-grow">
+        {contacts.map((contact) => (
+          <div
+            key={contact.id}
+            className={cn(
+              "flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50",
+              selectedChat?.id === contact.id && "bg-accent/80"
+            )}
+            onClick={() => handleSelectChat(contact)}
+          >
+            <Avatar>
+              <AvatarImage src={`https://picsum.photos/seed/${contact.avatar}/200`} />
+              <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-grow overflow-hidden">
+              <p className="font-semibold truncate">{contact.name}</p>
+              <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
+            </div>
+            <div className="text-xs text-muted-foreground text-right space-y-1">
+              <p>{contact.time}</p>
+              {contact.unread > 0 && (
+                <span className="inline-block bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
+                  {contact.unread}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </ScrollArea>
+    </div>
+  );
+
+  const ChatWindow = selectedChat && (
+    <div className="flex flex-col h-full">
+      {/* Chat Header */}
+      <div className="flex items-center p-3 border-b">
+        {isMobile && (
+           <Button variant="ghost" size="icon" className="mr-2" onClick={() => setSelectedChat(null)}>
+             <ArrowLeft className="h-6 w-6"/>
+           </Button>
+        )}
+        <Avatar>
+          <AvatarImage src={`https://picsum.photos/seed/${selectedChat.avatar}/200`} />
+          <AvatarFallback>{selectedChat.name.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div className="ml-4">
+          <p className="font-semibold text-lg font-headline">{selectedChat.name}</p>
+          <p className="text-sm text-muted-foreground">Online</p>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <ScrollArea className="flex-grow p-4 bg-background/30">
+        <div className="flex flex-col gap-4">
+          {(messages[selectedChat.id] || []).map((msg) => (
+            <div
+              key={msg.id}
+              className={cn(
+                "flex max-w-[75%] gap-2",
+                msg.own ? "ml-auto flex-row-reverse" : "mr-auto"
+              )}
+            >
+              <Avatar className="w-8 h-8">
+                 <AvatarImage src={`https://picsum.photos/seed/${msg.own ? 'user-avatar' : selectedChat.avatar}/200`} />
+                 <AvatarFallback>{msg.sender.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <div
+                  className={cn(
+                    "rounded-lg p-3 text-sm",
+                    msg.own
+                      ? "bg-primary text-primary-foreground rounded-br-none"
+                      : "bg-muted rounded-bl-none"
+                  )}
+                >
+                  <p>{msg.text}</p>
+                </div>
+                 <p className={cn("text-xs text-muted-foreground mt-1", msg.own ? 'text-right' : 'text-left')}>{msg.time}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {/* Message Input */}
+      <div className="p-4 border-t">
+        <form onSubmit={handleSendMessage} className="relative">
+          <Input 
+            placeholder="Type a message..." 
+            className="pr-28"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+          />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <Button variant="ghost" size="icon" type="button">
+              <Paperclip className="w-5 h-5" />
+            </Button>
+             <Button variant="ghost" size="icon" type="button">
+              <Mic className="w-5 h-5" />
+            </Button>
+            <Button size="icon" className="bg-accent hover:bg-accent/90" type="submit">
+              <SendHorizonal className="w-5 h-5" />
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col">
       <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass">
-        {/* Contacts List */}
-        <div className="flex flex-col border-r bg-muted/20">
-          <div className="p-4">
-            <h1 className="text-2xl font-bold font-headline">Chats</h1>
-            <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search chats..." className="pl-10" />
-            </div>
-          </div>
-          <Separator />
-          <ScrollArea className="flex-grow">
-            {contacts.map((contact) => (
-              <div
-                key={contact.id}
-                className={cn(
-                  "flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50",
-                  selectedChat.id === contact.id && "bg-accent/80"
-                )}
-                onClick={() => setSelectedChat(contact)}
-              >
-                <Avatar>
-                  <AvatarImage src={`https://picsum.photos/seed/${contact.avatar}/200`} />
-                  <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-grow overflow-hidden">
-                  <p className="font-semibold truncate">{contact.name}</p>
-                  <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
-                </div>
-                <div className="text-xs text-muted-foreground text-right space-y-1">
-                  <p>{contact.time}</p>
-                  {contact.unread > 0 && (
-                    <span className="inline-block bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
-                      {contact.unread}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </ScrollArea>
-        </div>
-
-        {/* Chat Window */}
-        <div className="flex flex-col">
-          {/* Chat Header */}
-          <div className="flex items-center p-3 border-b">
-            <Avatar>
-              <AvatarImage src={`https://picsum.photos/seed/${selectedChat.avatar}/200`} />
-              <AvatarFallback>{selectedChat.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="ml-4">
-              <p className="font-semibold text-lg font-headline">{selectedChat.name}</p>
-              <p className="text-sm text-muted-foreground">Online</p>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <ScrollArea className="flex-grow p-4 bg-background/30">
-            <div className="flex flex-col gap-4">
-              {currentMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex max-w-[75%] gap-2",
-                    msg.own ? "ml-auto flex-row-reverse" : "mr-auto"
-                  )}
-                >
-                  <Avatar className="w-8 h-8">
-                     <AvatarImage src={`https://picsum.photos/seed/${msg.own ? 'user-avatar' : selectedChat.avatar}/200`} />
-                     <AvatarFallback>{msg.sender.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <div
-                      className={cn(
-                        "rounded-lg p-3 text-sm",
-                        msg.own
-                          ? "bg-primary text-primary-foreground rounded-br-none"
-                          : "bg-muted rounded-bl-none"
-                      )}
-                    >
-                      <p>{msg.text}</p>
-                    </div>
-                     <p className={cn("text-xs text-muted-foreground mt-1", msg.own ? 'text-right' : 'text-left')}>{msg.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-
-          {/* Message Input */}
-          <div className="p-4 border-t">
-            <form onSubmit={handleSendMessage} className="relative">
-              <Input 
-                placeholder="Type a message..." 
-                className="pr-28"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-              />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <Button variant="ghost" size="icon" type="button">
-                  <Paperclip className="w-5 h-5" />
-                </Button>
-                 <Button variant="ghost" size="icon" type="button">
-                  <Mic className="w-5 h-5" />
-                </Button>
-                <Button size="icon" className="bg-accent hover:bg-accent/90" type="submit">
-                  <SendHorizonal className="w-5 h-5" />
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+         {isMobile ? (
+          selectedChat ? ChatWindow : ChatList
+        ) : (
+          <>
+            {ChatList}
+            {ChatWindow}
+          </>
+        )}
       </div>
     </div>
   );
