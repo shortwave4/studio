@@ -212,7 +212,7 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="h-[calc(100vh-140px)] flex flex-col">
+    <div className="h-[calc(100vh_-_theme(space.16)_-_theme(space.16))] flex flex-col">
       <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass">
          {isMobile ? (
           selectedChat ? ChatWindow : ChatList
