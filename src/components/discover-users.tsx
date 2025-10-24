@@ -48,11 +48,11 @@ export default function DiscoverUsers() {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {Array.from({ length: 8 }).map((_, i) => (
-          <Card key={i}>
+          <Card key={i} className="flex flex-col text-center">
             <CardHeader className="items-center">
               <Skeleton className="h-24 w-24 rounded-full" />
             </CardHeader>
-            <CardContent className="text-center">
+            <CardContent className="flex-grow">
               <Skeleton className="h-6 w-3/4 mx-auto" />
               <Skeleton className="h-4 w-full mx-auto mt-2" />
               <Skeleton className="h-4 w-1/2 mx-auto mt-1" />
