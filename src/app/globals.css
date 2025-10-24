@@ -81,10 +81,10 @@
   .bg-gradient-animation {
     background: linear-gradient(
       -45deg,
-      #e73c7e,
-      #ff6b6b,
-      #8a2be2,
-      #ffc107
+      #e73c7e, /* pink */
+      #ee7752, /* red */
+      #8a2be2, /* purple */
+      #ffc107  /* yellow */
     );
     background-size: 400% 400%;
     animation: gradient-animation 15s ease infinite;
@@ -100,5 +100,15 @@
     100% {
       background-position: 0% 50%;
     }
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-card/60 backdrop-blur-sm border-white/20;
+  }
+
+  .dark .glass {
+    @apply bg-card/40 backdrop-blur-sm border-white/10;
   }
 }

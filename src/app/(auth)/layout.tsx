@@ -6,7 +6,7 @@ export default function AuthLayout({
   return (
     <main className="flex items-center justify-center min-h-screen bg-background relative overflow-hidden">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
-      <div className="relative z-10 w-full flex justify-center">
+      <div className="relative z-10 w-full flex justify-center p-4">
         {children}
       </div>
     </main>
