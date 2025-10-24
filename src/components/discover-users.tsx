@@ -1,13 +1,19 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { getSuggestedUsers } from "@/lib/actions";
-import type { UserProfile } from "@/types";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { MessageSquarePlus } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import * as React from 'react';
+import { getSuggestedUsers } from '@/lib/actions';
+import type { UserProfile } from '@/types';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { MessageSquarePlus } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DiscoverUsers() {
   const [users, setUsers] = React.useState<UserProfile[]>([]);
@@ -16,7 +22,8 @@ export default function DiscoverUsers() {
 
   React.useEffect(() => {
     async function fetchUsers() {
-      // Mock user's location. In a real app, this would come from the user's profile.
+      // In a real app, you'd get the user's location from their profile
+      // or use the browser's Geolocation API.
       const userLocation = {
         latitude: 34.0522,
         longitude: -118.2437,
@@ -27,7 +34,8 @@ export default function DiscoverUsers() {
         const suggestedUsers = await getSuggestedUsers(userLocation);
         setUsers(suggestedUsers);
       } catch (e) {
-        setError("Failed to load suggestions. Please try again later.");
+        setError('Failed to load suggestions. Please try again later.');
+        console.error(e);
       } finally {
         setLoading(false);
       }
@@ -47,7 +55,7 @@ export default function DiscoverUsers() {
             <CardContent className="text-center">
               <Skeleton className="h-6 w-3/4 mx-auto" />
               <Skeleton className="h-4 w-full mx-auto mt-2" />
-               <Skeleton className="h-4 w-1/2 mx-auto mt-1" />
+              <Skeleton className="h-4 w-1/2 mx-auto mt-1" />
             </CardContent>
             <CardFooter>
               <Skeleton className="h-10 w-full" />
@@ -65,10 +73,17 @@ export default function DiscoverUsers() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {users.map((user) => (
-        <Card key={user.userId} className="flex flex-col text-center shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <Card
+          key={user.userId}
+          className="flex flex-col text-center shadow-lg hover:shadow-xl transition-shadow duration-300"
+        >
           <CardHeader className="items-center">
             <Avatar className="w-24 h-24 border-4 border-background ring-2 ring-primary">
-              <AvatarImage src={`https://picsum.photos/seed/${user.userId}/200/200`} alt={user.name} data-ai-hint="person portrait" />
+              <AvatarImage
+                src={`https://picsum.photos/seed/${user.userId}/200/200`}
+                alt={user.name}
+                data-ai-hint="person portrait"
+              />
               <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
             </Avatar>
           </CardHeader>

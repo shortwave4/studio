@@ -1,13 +1,18 @@
-"use server";
+'use server';
 
-import { suggestUsersByLocation, SuggestUsersByLocationInput } from "@/ai/flows/suggest-users-by-location";
+import {
+  suggestUsersByLocation,
+  SuggestUsersByLocationInput,
+} from '@/ai/flows/suggest-users-by-location';
 
 export async function getSuggestedUsers(input: SuggestUsersByLocationInput) {
   try {
     const suggestions = await suggestUsersByLocation(input);
     return suggestions;
   } catch (error) {
-    console.error("Error fetching user suggestions:", error);
+    console.error('Error fetching user suggestions:', error);
+    // In a real app, you might want to return a more specific error
+    // that the client can handle, but for now, an empty array is fine.
     return [];
   }
 }
