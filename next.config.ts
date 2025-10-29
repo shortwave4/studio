@@ -8,17 +8,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  allowedDevOrigins: [
-    '6000-firebase-connectsphere22-1761572198135.cluster-m7dwy2bmizezqukxkuxd55k5ka.cloudworkstations.dev',
-  ],
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
