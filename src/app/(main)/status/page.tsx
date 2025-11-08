@@ -16,8 +16,7 @@ type Status = {
   hasNew: boolean;
 };
 
-export default function StatusPage() {
-  const statuses: Status[] = [
+const mockStatuses: Status[] = [
     { name: "Alice", avatar: "user1", imageUrl: "https://picsum.photos/seed/status1/400/600", hasNew: true },
     { name: "Bob", avatar: "user2", imageUrl: "https://picsum.photos/seed/status2/400/600", hasNew: true },
     { name: "Charlie", avatar: "user3", imageUrl: "https://picsum.photos/seed/status3/400/600", hasNew: false },
@@ -26,11 +25,13 @@ export default function StatusPage() {
     { name: "Fiona", avatar: "user6", imageUrl: "https://picsum.photos/seed/status6/400/600", hasNew: false },
     { name: "George", avatar: "user7", imageUrl: "https://picsum.photos/seed/status7/400/600", hasNew: true },
   ];
-  
-  const [selectedStatus, setSelectedStatus] = useState<Status | null>(statuses.find(s => s.hasNew) || null);
+
+export default function StatusPage() {
+  const [statuses] = useState<Status[]>(mockStatuses);
+  const [selectedStatus, setSelectedStatus] = useState<Status | null>(statuses.find(s => s.hasNew) || (statuses.length > 0 ? statuses[0] : null));
 
   return (
-    <div className="h-[calc(100vh_-_theme(space.16)_-_theme(space.16))] flex flex-col gap-6">
+    <div className="h-[calc(100vh_-_var(--header-height)_-_theme(spacing.16))] flex flex-col gap-6" style={{ '--header-height': '60px' } as React.CSSProperties}>
        <Card className="glass flex-shrink-0">
          <CardContent className="p-4">
             <div className="flex justify-between items-center mb-4">
@@ -43,8 +44,8 @@ export default function StatusPage() {
             <ScrollArea className="w-full whitespace-nowrap">
                 <div className="flex w-max space-x-6 pb-4">
                 {statuses.map((status) => (
-                    <div 
-                        key={status.name} 
+                    <div
+                        key={status.name}
                         className="flex flex-col items-center gap-2 cursor-pointer group"
                         onClick={() => setSelectedStatus(status)}
                     >
@@ -64,12 +65,12 @@ export default function StatusPage() {
             </ScrollArea>
          </CardContent>
        </Card>
-      
+
       <div className="flex-grow flex items-center justify-center">
         {selectedStatus ? (
             <Card className="w-full max-w-md bg-gradient-animation text-primary-foreground aspect-[9/16] relative overflow-hidden">
-                <Image 
-                  src={selectedStatus.imageUrl} 
+                <Image
+                  src={selectedStatus.imageUrl}
                   alt={`Status from ${selectedStatus.name}`}
                   fill
                   className="absolute inset-0 w-full h-full object-cover opacity-50"
@@ -95,7 +96,7 @@ export default function StatusPage() {
         ) : (
             <div className="text-center text-muted-foreground">
                 <ImageIcon className="w-16 h-16 mx-auto mb-4" />
-                <h2 className="text-xl font-bold font-headline">No Status Selected</h2>
+                <h2 className="text-xl font-bold font-headline">No Status Available</h2>
                 <p>Select a status from the list above to view it.</p>
             </div>
         )}

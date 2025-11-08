@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect, FormEvent } from "react";
@@ -28,6 +27,15 @@ type Message = {
   own: boolean;
 };
 
+// Mock data to replace Firestore call
+const mockContacts: ChatContact[] = [
+  { userId: 'user1', name: 'Alice', bio: 'Loves hiking', lastMessage: 'See you tomorrow!', lastMessageTime: '10:45', unread: 2 },
+  { userId: 'user2', name: 'Bob', bio: 'Coder and gamer', lastMessage: 'Sounds good!', lastMessageTime: '09:30', unread: 0 },
+  { userId: 'user3', name: 'Charlie', bio: 'Foodie', lastMessage: 'I am on my way', lastMessageTime: 'Yesterday', unread: 5 },
+  { userId: 'user4', name: 'Diana', bio: 'Musician', lastMessage: 'Next week?', lastMessageTime: 'Yesterday', unread: 0 },
+];
+
+
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
 }
@@ -37,34 +45,27 @@ export default function ChatPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersRef);
-
-  const [contacts, setContacts] = useState<ChatContact[]>([]);
+  const [contacts, setContacts] = useState<ChatContact[]>(mockContacts);
   const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
   const [newMessage, setNewMessage] = useState("");
+  const usersLoading = false; // Since we are not loading from firestore anymore
 
   useEffect(() => {
-    if (users && user) {
-      const otherUsers = users.filter(u => u.id !== user.uid);
-      setContacts(otherUsers.map(u => ({
-        ...u,
-        lastMessage: "...",
-        lastMessageTime: "",
-        unread: 0
-      })));
-    }
-  }, [users, user]);
-  
-  useEffect(() => {
     if (!isMobile && contacts.length > 0) {
-      setSelectedChat(contacts[0]);
+      // Set a default selected chat on desktop
+      if (!selectedChat) {
+         setSelectedChat(contacts[0]);
+      }
     }
-  }, [contacts, isMobile]);
+     if (isMobile && selectedChat) {
+      // On mobile, if a chat is selected, we shouldn't be seeing the list.
+      // This state is handled by the main return's conditional rendering.
+    }
+  }, [contacts, isMobile, selectedChat]);
 
   const messagesQuery = useMemoFirebase(() => {
     if (!firestore || !user || !selectedChat) return null;
-    const chatId = getChatId(user.uid, selectedChat.id);
+    const chatId = getChatId(user.uid, selectedChat.userId);
     return query(collection(firestore, 'chats', chatId, 'messages'), orderBy('timestamp', 'asc'));
   }, [firestore, user, selectedChat]);
   
@@ -87,7 +88,7 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !firestore) return;
 
-    const chatId = getChatId(user.uid, selectedChat.id);
+    const chatId = getChatId(user.uid, selectedChat.userId);
     const messagesCol = collection(firestore, 'chats', chatId, 'messages');
     
     addDocumentNonBlocking(messagesCol, {
@@ -131,15 +132,15 @@ export default function ChatPage() {
         ) : (
           contacts.map((contact) => (
             <div
-              key={contact.id}
+              key={contact.userId}
               className={cn(
                 "flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50",
-                selectedChat?.id === contact.id && "bg-accent/80"
+                selectedChat?.userId === contact.userId && "bg-accent/80"
               )}
               onClick={() => handleSelectChat(contact)}
             >
               <Avatar>
-                <AvatarImage src={`https://picsum.photos/seed/${contact.id}/200`} />
+                <AvatarImage src={`https://picsum.photos/seed/${contact.userId}/200`} />
                 <AvatarFallback>{contact.name?.charAt(0)}</AvatarFallback>
               </Avatar>
               <div className="flex-grow overflow-hidden">
@@ -171,7 +172,7 @@ export default function ChatPage() {
            </Button>
         )}
         <Avatar>
-          <AvatarImage src={`https://picsum.photos/seed/${selectedChat.id}/200`} />
+          <AvatarImage src={`https://picsum.photos/seed/${selectedChat.userId}/200`} />
           <AvatarFallback>{selectedChat.name?.charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="ml-4">
@@ -192,7 +193,7 @@ export default function ChatPage() {
               )}
             >
               <Avatar className="w-8 h-8">
-                 <AvatarImage src={`https://picsum.photos/seed/${msg.own ? user?.uid : selectedChat.id}/200`} />
+                 <AvatarImage src={`https://picsum.photos/seed/${msg.own ? user?.uid : selectedChat.userId}/200`} />
                  <AvatarFallback>{msg.own ? user?.displayName?.charAt(0) : selectedChat.name?.charAt(0)}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
@@ -240,8 +241,8 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="h-[calc(100vh_-_theme(space.16)_-_theme(space.16))] flex flex-col">
-      <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass">
+    <div className="h-[calc(100vh_-_var(--header-height)_-_theme(spacing.16))] flex flex-col" style={{ '--header-height': '60px' } as React.CSSProperties}>
+      <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass h-full">
          {isMobile ? (
           selectedChat ? ChatWindow : ChatList
         ) : (
@@ -262,6 +263,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-
-    
