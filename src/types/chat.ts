@@ -1,3 +1,4 @@
+
 import type { UserProfile } from '@/types';
 import type { Timestamp } from 'firebase/firestore';
 
@@ -13,4 +14,7 @@ export type Message = {
   text: string;
   timestamp?: Timestamp | Date;
   own: boolean;
+  status?: 'sending' | 'sent' | 'failed';
 };
+
+    

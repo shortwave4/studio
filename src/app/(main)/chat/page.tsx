@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo, useEffect, FormEvent } from 'react';
+import { useState, useMemo, useEffect, FormEvent, useRef } from 'react';
 import {
   collection,
   query,
@@ -45,9 +46,11 @@ export default function ChatPage() {
   const isMobile = useIsMobile();
   const firestore = useFirestore();
   const { user } = useUser();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
   const [newMessage, setNewMessage] = useState('');
+  const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
 
   const usersQuery = useMemoFirebase(
     () =>
@@ -72,13 +75,53 @@ export default function ChatPage() {
     messagesQuery
   );
 
+  useEffect(() => {
+    // When a new chat is selected, clear optimistic messages
+    setOptimisticMessages([]);
+  }, [selectedChat]);
+
   const messages: Message[] = useMemo(() => {
-    if (!messagesData || !user) return [];
-    return messagesData.map((msg) => ({
-      ...msg,
-      own: msg.senderId === user.uid,
-    }));
-  }, [messagesData, user]);
+    if (!user) return [];
+    const combinedMessages: Message[] = [];
+  
+    if (messagesData) {
+      messagesData.forEach((msg) => {
+        combinedMessages.push({
+          ...msg,
+          own: msg.senderId === user.uid,
+          status: 'sent',
+        });
+      });
+    }
+  
+    // Filter optimistic messages to only include those for the current chat
+    const relevantOptimisticMessages = optimisticMessages.filter(
+      (optMsg) =>
+        selectedChat &&
+        getChatId(optMsg.senderId, selectedChat.id) === getChatId(user.uid, selectedChat.id)
+    );
+  
+    // Add optimistic messages that are not yet in the 'sent' messages
+    relevantOptimisticMessages.forEach((optMsg) => {
+      if (!combinedMessages.some((m) => m.id === optMsg.id)) {
+        combinedMessages.push(optMsg);
+      }
+    });
+  
+    // Update optimistic messages once they arrive from Firestore
+    useEffect(() => {
+      const sentMessageIds = messagesData?.map(m => m.id) || [];
+      const newOptimisticMessages = optimisticMessages.filter(
+        optMsg => !sentMessageIds.includes(optMsg.id)
+      );
+      if(newOptimisticMessages.length < optimisticMessages.length) {
+        setOptimisticMessages(newOptimisticMessages);
+      }
+    }, [messagesData]);
+  
+    return combinedMessages;
+  }, [messagesData, optimisticMessages, user, selectedChat]);
+
 
   useEffect(() => {
     if (!isMobile && contacts && contacts.length > 0 && !selectedChat) {
@@ -88,6 +131,15 @@ export default function ChatPage() {
       });
     }
   }, [contacts, isMobile, selectedChat]);
+
+   useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('div:first-child');
+        if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+    }
+  }, [messages]);
 
   const handleSelectChat = (contact: UserProfile) => {
     setSelectedChat({
@@ -102,11 +154,28 @@ export default function ChatPage() {
 
     const chatId = getChatId(user.uid, selectedChat.id);
     const messagesCol = collection(firestore, 'chats', chatId, 'messages');
+    
+    // Optimistic update
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: optimisticId,
+      text: newMessage,
+      senderId: user.uid,
+      timestamp: new Date(),
+      own: true,
+      status: 'sending',
+    };
+
+    setOptimisticMessages(prev => [...prev, optimisticMessage]);
 
     addDocumentNonBlocking(messagesCol, {
       text: newMessage,
       senderId: user.uid,
       timestamp: serverTimestamp(),
+    }).then(docRef => {
+        // Once the message is sent, we can remove it from the optimistic list
+        // if we get the real one from the listener.
+        // Or update its status if we want to show 'sent'
     });
 
     setNewMessage('');
@@ -200,14 +269,15 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-grow p-4 bg-background/30">
+      <ScrollArea className="flex-grow p-4 bg-background/30" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
           {messages.map((msg) => (
             <div
               key={msg.id}
               className={cn(
                 'flex max-w-[75%] gap-2',
-                msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto'
+                msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto',
+                msg.status === 'sending' && 'opacity-50'
               )}
             >
               <Avatar className="w-8 h-8">
@@ -237,7 +307,7 @@ export default function ChatPage() {
                     msg.own ? 'text-right' : 'text-left'
                   )}
                 >
-                  {getTimeString(msg.timestamp)}
+                   {msg.status === 'sending' ? 'Sending...' : getTimeString(msg.timestamp)}
                 </p>
               </div>
             </div>
@@ -312,3 +382,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
