@@ -1,48 +1,41 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useEffect, FormEvent } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase";
-import { collection, serverTimestamp, Timestamp } from "firebase/firestore";
+import { useState, useMemo, useEffect, FormEvent } from 'react';
+import {
+  collection,
+  query,
+  where,
+  serverTimestamp,
+  Timestamp,
+  orderBy,
+} from 'firebase/firestore';
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import {
+  useUser,
+  useFirestore,
+  addDocumentNonBlocking,
+  useCollection,
+  useMemoFirebase,
+} from '@/firebase';
+import { cn } from '@/lib/utils';
+import {
+  Search,
+  Paperclip,
+  Mic,
+  SendHorizonal,
+  ArrowLeft,
+} from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile } from '@/types';
-
-type ChatContact = UserProfile & {
-  lastMessage?: string;
-  lastMessageTime?: string;
-  unread?: number;
-};
-
-type Message = {
-  id: string;
-  senderId: string;
-  text: string;
-  timestamp: Timestamp | Date;
-  own: boolean;
-};
-
-// Mock data to replace Firestore call
-const mockContacts: ChatContact[] = [
-  { userId: 'user1', name: 'Alice', bio: 'Loves hiking', lastMessage: 'See you tomorrow!', lastMessageTime: '10:45', unread: 2 },
-  { userId: 'user2', name: 'Bob', bio: 'Coder and gamer', lastMessage: 'Sounds good!', lastMessageTime: '09:30', unread: 0 },
-  { userId: 'user3', name: 'Charlie', bio: 'Foodie', lastMessage: 'I am on my way', lastMessageTime: 'Yesterday', unread: 5 },
-  { userId: 'user4', name: 'Diana', bio: 'Musician', lastMessage: 'Next week?', lastMessageTime: 'Yesterday', unread: 0 },
-];
-
-const mockMessages: Omit<Message, 'own'>[] = [
-    { id: 'msg1', senderId: 'user1', text: 'Hey, how is it going?', timestamp: new Date(Date.now() - 1000 * 60 * 5) },
-    { id: 'msg2', senderId: 'currentUser', text: 'Hey Alice! I am doing great. How about you?', timestamp: new Date(Date.now() - 1000 * 60 * 4) },
-    { id: 'msg3', senderId: 'user1', text: 'Doing well, thanks! Just working on the new project.', timestamp: new Date(Date.now() - 1000 * 60 * 3) },
-    { id: 'msg4', senderId: 'currentUser', text: 'Nice! Anything exciting?', timestamp: new Date(Date.now() - 1000 * 60 * 2) },
-    { id: 'msg5', senderId: 'user1', text: 'Yeah, we are adding a new chat feature!', timestamp: new Date(Date.now() - 1000 * 60 * 1) },
-];
-
+import type { ChatContact, Message } from '@/types/chat';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -53,64 +46,78 @@ export default function ChatPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const [contacts, setContacts] = useState<ChatContact[]>(mockContacts);
   const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
-  const [newMessage, setNewMessage] = useState("");
-  const usersLoading = false; // Since we are not loading from firestore anymore
+  const [newMessage, setNewMessage] = useState('');
+
+  const usersQuery = useMemoFirebase(
+    () =>
+      user
+        ? query(collection(firestore, 'users'), where('id', '!=', user.uid))
+        : null,
+    [firestore, user]
+  );
+  const { data: contacts, isLoading: usersLoading } =
+    useCollection<UserProfile>(usersQuery);
+
+  const messagesQuery = useMemoFirebase(() => {
+    if (!user || !selectedChat) return null;
+    const chatId = getChatId(user.uid, selectedChat.id);
+    return query(
+      collection(firestore, 'chats', chatId, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+  }, [user, selectedChat, firestore]);
+
+  const { data: messagesData } = useCollection<Omit<Message, 'own'>>(
+    messagesQuery
+  );
+
+  const messages: Message[] = useMemo(() => {
+    if (!messagesData || !user) return [];
+    return messagesData.map((msg) => ({
+      ...msg,
+      own: msg.senderId === user.uid,
+    }));
+  }, [messagesData, user]);
 
   useEffect(() => {
-    if (!isMobile && contacts.length > 0) {
-      // Set a default selected chat on desktop
-      if (!selectedChat) {
-         setSelectedChat(contacts[0]);
-      }
-    }
-     if (isMobile && selectedChat) {
-      // On mobile, if a chat is selected, we shouldn't be seeing the list.
-      // This state is handled by the main return's conditional rendering.
+    if (!isMobile && contacts && contacts.length > 0 && !selectedChat) {
+      setSelectedChat({
+        ...contacts[0],
+        lastMessage: 'Select a chat to start messaging',
+      });
     }
   }, [contacts, isMobile, selectedChat]);
-  
-  const messages: Message[] = useMemo(() => {
-    if (!selectedChat || !user) return [];
-    return mockMessages.map(msg => ({
-      ...msg,
-      own: msg.senderId === 'currentUser' || msg.senderId === user.uid,
-      // Replace senderId for display
-      senderId: msg.senderId === 'currentUser' ? user.uid : msg.senderId,
-    }));
-  }, [selectedChat, user]);
 
-
-  const handleSelectChat = (contact: ChatContact) => {
-    setSelectedChat(contact);
+  const handleSelectChat = (contact: UserProfile) => {
+    setSelectedChat({
+      ...contact,
+      lastMessage: '...',
+    });
   };
-  
+
   const handleSendMessage = (e: FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !firestore) return;
 
-    const chatId = getChatId(user.uid, selectedChat.userId);
+    const chatId = getChatId(user.uid, selectedChat.id);
     const messagesCol = collection(firestore, 'chats', chatId, 'messages');
-    
+
     addDocumentNonBlocking(messagesCol, {
       text: newMessage,
       senderId: user.uid,
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
     });
 
-    // NOTE: This will not appear in the UI as we are using mock data.
-    // In a real implementation, the `useCollection` hook would update the UI.
-    console.log("New message sent to Firestore (will not appear in mock UI):", newMessage);
-
-    setNewMessage("");
+    setNewMessage('');
   };
 
-  const getTimeString = (timestamp: Timestamp | Date) => {
-      if (!timestamp) return '';
-      const date = (timestamp as Timestamp).toDate ? (timestamp as Timestamp).toDate() : (timestamp as Date);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
+  const getTimeString = (timestamp: Timestamp | Date | undefined) => {
+    if (!timestamp) return '';
+    const date =
+      timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   const ChatList = (
     <div className="flex flex-col border-r bg-muted/20 h-full">
@@ -127,39 +134,35 @@ export default function ChatPage() {
           <div className="p-4 space-y-4">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex items-center gap-4">
-                 <div className="h-12 w-12 rounded-full bg-muted-foreground/20 animate-pulse" />
-                 <div className="flex-grow space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-muted-foreground/20 animate-pulse" />
-                    <div className="h-3 w-1/2 rounded bg-muted-foreground/20 animate-pulse" />
-                 </div>
+                <div className="h-12 w-12 rounded-full bg-muted-foreground/20 animate-pulse" />
+                <div className="flex-grow space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted-foreground/20 animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-muted-foreground/20 animate-pulse" />
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          contacts.map((contact) => (
+          contacts?.map((contact) => (
             <div
-              key={contact.userId}
+              key={contact.id}
               className={cn(
-                "flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50",
-                selectedChat?.userId === contact.userId && "bg-accent/80"
+                'flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
+                selectedChat?.id === contact.id && 'bg-accent/80'
               )}
               onClick={() => handleSelectChat(contact)}
             >
               <Avatar>
-                <AvatarImage src={`https://picsum.photos/seed/${contact.userId}/200`} />
+                <AvatarImage
+                  src={`https://picsum.photos/seed/${contact.id}/200`}
+                />
                 <AvatarFallback>{contact.name?.charAt(0)}</AvatarFallback>
               </Avatar>
               <div className="flex-grow overflow-hidden">
                 <p className="font-semibold truncate">{contact.name}</p>
-                <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
-              </div>
-              <div className="text-xs text-muted-foreground text-right space-y-1">
-                <p>{contact.lastMessageTime}</p>
-                {contact.unread && contact.unread > 0 && (
-                  <span className="inline-block bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
-                    {contact.unread}
-                  </span>
-                )}
+                <p className="text-sm text-muted-foreground truncate">
+                  {/* Real last message would go here */}
+                </p>
               </div>
             </div>
           ))
@@ -173,16 +176,25 @@ export default function ChatPage() {
       {/* Chat Header */}
       <div className="flex items-center p-3 border-b">
         {isMobile && (
-           <Button variant="ghost" size="icon" className="mr-2" onClick={() => setSelectedChat(null)}>
-             <ArrowLeft className="h-6 w-6"/>
-           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mr-2"
+            onClick={() => setSelectedChat(null)}
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
         )}
         <Avatar>
-          <AvatarImage src={`https://picsum.photos/seed/${selectedChat.userId}/200`} />
+          <AvatarImage
+            src={`https://picsum.photos/seed/${selectedChat.id}/200`}
+          />
           <AvatarFallback>{selectedChat.name?.charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="ml-4">
-          <p className="font-semibold text-lg font-headline">{selectedChat.name}</p>
+          <p className="font-semibold text-lg font-headline">
+            {selectedChat.name}
+          </p>
           <p className="text-sm text-muted-foreground">Online</p>
         </div>
       </div>
@@ -194,26 +206,39 @@ export default function ChatPage() {
             <div
               key={msg.id}
               className={cn(
-                "flex max-w-[75%] gap-2",
-                msg.own ? "ml-auto flex-row-reverse" : "mr-auto"
+                'flex max-w-[75%] gap-2',
+                msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto'
               )}
             >
               <Avatar className="w-8 h-8">
-                 <AvatarImage src={`https://picsum.photos/seed/${msg.own ? user?.uid : selectedChat.userId}/200`} />
-                 <AvatarFallback>{msg.own ? user?.displayName?.charAt(0) : selectedChat.name?.charAt(0)}</AvatarFallback>
+                <AvatarImage
+                  src={`https://picsum.photos/seed/${msg.senderId}/200`}
+                />
+                <AvatarFallback>
+                  {msg.own
+                    ? user?.displayName?.charAt(0)
+                    : selectedChat.name?.charAt(0)}
+                </AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
                 <div
                   className={cn(
-                    "rounded-lg p-3 text-sm",
+                    'rounded-lg p-3 text-sm',
                     msg.own
-                      ? "bg-primary text-primary-foreground rounded-br-none"
-                      : "bg-muted rounded-bl-none"
+                      ? 'bg-primary text-primary-foreground rounded-br-none'
+                      : 'bg-muted rounded-bl-none'
                   )}
                 >
                   <p>{msg.text}</p>
                 </div>
-                 <p className={cn("text-xs text-muted-foreground mt-1", msg.own ? 'text-right' : 'text-left')}>{getTimeString(msg.timestamp)}</p>
+                <p
+                  className={cn(
+                    'text-xs text-muted-foreground mt-1',
+                    msg.own ? 'text-right' : 'text-left'
+                  )}
+                >
+                  {getTimeString(msg.timestamp)}
+                </p>
               </div>
             </div>
           ))}
@@ -223,8 +248,8 @@ export default function ChatPage() {
       {/* Message Input */}
       <div className="p-4 border-t">
         <form onSubmit={handleSendMessage} className="relative">
-          <Input 
-            placeholder="Type a message..." 
+          <Input
+            placeholder="Type a message..."
             className="pr-28"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
@@ -234,10 +259,15 @@ export default function ChatPage() {
             <Button variant="ghost" size="icon" type="button">
               <Paperclip className="w-5 h-5" />
             </Button>
-             <Button variant="ghost" size="icon" type="button">
+            <Button variant="ghost" size="icon" type="button">
               <Mic className="w-5 h-5" />
             </Button>
-            <Button size="icon" className="bg-accent hover:bg-accent/90" type="submit" disabled={!selectedChat || !newMessage.trim()}>
+            <Button
+              size="icon"
+              className="bg-accent hover:bg-accent/90"
+              type="submit"
+              disabled={!selectedChat || !newMessage.trim()}
+            >
               <SendHorizonal className="w-5 h-5" />
             </Button>
           </div>
@@ -247,21 +277,34 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="h-[calc(100vh_-_var(--header-height)_-_theme(spacing.16))] flex flex-col" style={{ '--header-height': '60px' } as React.CSSProperties}>
+    <div
+      className="h-[calc(100vh_-_var(--header-height)_-_theme(spacing.16))] flex flex-col"
+      style={{ '--header-height': '60px' } as React.CSSProperties}
+    >
       <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass h-full">
-         {isMobile ? (
-          selectedChat ? ChatWindow : ChatList
+        {isMobile ? (
+          selectedChat ? (
+            ChatWindow
+          ) : (
+            ChatList
+          )
         ) : (
           <>
             {ChatList}
-            {ChatWindow ? ChatWindow : (
-                <div className="flex flex-col h-full items-center justify-center text-center p-8 bg-background/30">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-accent to-primary flex items-center justify-center mb-6">
-                        <SendHorizonal className="w-10 h-10 text-primary-foreground" />
-                    </div>
-                    <h2 className="text-2xl font-bold font-headline">Welcome to ConnectSphere Chat</h2>
-                    <p className="text-muted-foreground mt-2">Select a conversation from the list to start messaging.</p>
+            {ChatWindow ? (
+              ChatWindow
+            ) : (
+              <div className="flex flex-col h-full items-center justify-center text-center p-8 bg-background/30">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-accent to-primary flex items-center justify-center mb-6">
+                  <SendHorizonal className="w-10 h-10 text-primary-foreground" />
                 </div>
+                <h2 className="text-2xl font-bold font-headline">
+                  Welcome to ConnectSphere Chat
+                </h2>
+                <p className="text-muted-foreground mt-2">
+                  Select a conversation from the list to start messaging.
+                </p>
+              </div>
             )}
           </>
         )}
