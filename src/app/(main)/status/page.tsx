@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -19,28 +20,20 @@ type Status = {
   hasNew: boolean;
 };
 
-const mockUsers = [
-    { id: 'user1', name: 'Alice', avatarUrl: 'https://picsum.photos/seed/user1/200' },
-    { id: 'user2', name: 'Bob', avatarUrl: 'https://picsum.photos/seed/user2/200' },
-    { id: 'user3', name: 'Charlie', avatarUrl: 'https://picsum.photos/seed/user3/200' },
-    { id: 'user4', name: 'Diana', avatarUrl: 'https://picsum.photos/seed/user4/200' },
-    { id: 'user5', name: 'Ethan', avatarUrl: 'https://picsum.photos/seed/user5/200' },
-    { id: 'user6', name: 'Fiona', avatarUrl: 'https://picsum.photos/seed/user6/200' },
-    { id: 'user7', name: 'George', avatarUrl: 'https://picsum.photos/seed/user7/200' },
-];
-
-// Combine placeholder images with mock users
-const mockStatuses: Status[] = mockUsers.map((user, index) => {
+// Create statuses from placeholder data
+const statusUsers = PlaceHolderImages.filter(p => p.id.startsWith('user-'));
+const mockStatuses: Status[] = statusUsers.map((user) => {
     const statusImage = PlaceHolderImages.find(p => p.id === `status-${user.id}`);
     return {
         id: user.id,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-        imageUrl: statusImage?.imageUrl || `https://picsum.photos/seed/status${index + 1}/400/600`,
+        name: user.id.charAt(0).toUpperCase() + user.id.slice(1).replace('-', ' '),
+        avatarUrl: `https://picsum.photos/seed/${user.id}/200`,
+        imageUrl: statusImage?.imageUrl || `https://picsum.photos/seed/status-${user.id}/400/600`,
         imageHint: statusImage?.imageHint || 'status update',
-        hasNew: Math.random() > 0.5, // Randomly set some statuses as new
+        hasNew: Math.random() > 0.5,
     };
 });
+
 
 export default function StatusPage() {
   const [statuses] = useState<Status[]>(mockStatuses);
@@ -126,5 +119,3 @@ export default function StatusPage() {
     </div>
   );
 }
-
-    
