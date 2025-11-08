@@ -49,6 +49,13 @@ const mockContacts: UserProfile[] = [
     { userId: 'user4', name: 'Diana', bio: 'Musician and artist.' },
 ];
 
+const mockMessages: Omit<Message, 'own' | 'status'>[] = [
+  { id: 'm1', senderId: 'user1', text: 'Hey, how is it going?', timestamp: new Date(Date.now() - 1000 * 60 * 5) },
+  { id: 'm2', senderId: 'currentUser', text: 'Doing great! How about you?', timestamp: new Date(Date.now() - 1000 * 60 * 4) },
+  { id: 'm3', senderId: 'user1', text: 'Awesome! I was thinking we could grab a coffee sometime.', timestamp: new Date(Date.now() - 1000 * 60 * 3) },
+];
+
+
 export default function ChatPage() {
   const isMobile = useIsMobile();
   const firestore = useFirestore();
@@ -63,25 +70,21 @@ export default function ChatPage() {
   const contacts: UserProfile[] = mockContacts;
   const usersLoading = false;
 
-  const messagesQuery = useMemoFirebase(() => {
-    if (!user || !selectedChat) return null;
-    const chatId = getChatId(user.uid, selectedChat.id);
-    return query(
-      collection(firestore, 'chats', chatId, 'messages'),
-      orderBy('timestamp', 'asc')
-    );
-  }, [user, selectedChat, firestore]);
+  const messagesData = useMemo(() => {
+    if (!user || !selectedChat) return [];
+    return mockMessages.map(msg => ({
+      ...msg,
+      senderId: msg.senderId === 'currentUser' ? user.uid : selectedChat.id,
+    }));
+  }, [user, selectedChat]);
 
-  const { data: messagesData } = useCollection<Omit<Message, 'own'>>(
-    messagesQuery
-  );
 
   useEffect(() => {
     // When a new chat is selected, clear optimistic messages
     setOptimisticMessages([]);
   }, [selectedChat]);
   
-  // Update optimistic messages once they arrive from Firestore
+  // Update optimistic messages once they arrive from Firestore (this part is now moot with mock data but harmless)
   useEffect(() => {
     if (!messagesData) return;
     const sentMessageIds = messagesData.map(m => m.id);
@@ -178,9 +181,13 @@ export default function ChatPage() {
       senderId: user.uid,
       timestamp: serverTimestamp(),
     }).then(docRef => {
-        // Once the message is sent, we can remove it from the optimistic list
-        // if we get the real one from the listener.
-        // Or update its status if we want to show 'sent'
+        // This logic will kick in if we switch back to live data
+        // For now, we manually simulate the sent status
+        setTimeout(() => {
+             setOptimisticMessages(prev => prev.map(msg => 
+                msg.id === optimisticId ? { ...msg, status: 'sent' } : msg
+            ));
+        }, 1000);
     });
 
     setNewMessage('');
@@ -387,3 +394,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
