@@ -14,7 +14,7 @@ type StatusStory = {
   id: string;
   imageUrl: string;
   imageHint: string;
-  duration: number; 
+  duration: number;
 };
 
 type StatusUser = {
@@ -27,23 +27,25 @@ type StatusUser = {
 
 // Create statuses from placeholder data
 const statusUsers = PlaceHolderImages.filter(p => p.id.startsWith('user-'));
+const statusImages = PlaceHolderImages.filter(p => p.id.startsWith('status-'));
+
 const mockStatuses: StatusUser[] = statusUsers.map((user) => {
-    const statusImage = PlaceHolderImages.find(p => p.id === `status-${user.id}`);
+    const statusImage = statusImages.find(p => p.id === `status-${user.id.replace('user-','user')}`);
     return {
         id: user.id,
-        name: user.description,
+        name: user.description.split('.')[0], // Keep it short
         avatarUrl: user.imageUrl,
-        stories: [
+        stories: statusImage ? [
             {
-                id: statusImage?.id || `story-${user.id}`,
-                imageUrl: statusImage?.imageUrl || `https://picsum.photos/seed/status-${user.id}/400/700`,
-                imageHint: statusImage?.imageHint || 'status update',
+                id: statusImage.id,
+                imageUrl: statusImage.imageUrl,
+                imageHint: statusImage.imageHint,
                 duration: 5000, // 5 seconds
             }
-        ],
+        ] : [], // Ensure stories is an empty array if no image is found
         hasNew: Math.random() > 0.5,
     };
-});
+}).filter(u => u.stories.length > 0); // Filter out users with no stories
 
 export default function StatusPage() {
   const [statuses] = useState<StatusUser[]>(mockStatuses);
@@ -53,6 +55,17 @@ export default function StatusPage() {
   const timerRef = useRef<NodeJS.Timeout>();
   const progressTimerRef = useRef<NodeJS.Timeout>();
 
+  const handleNextStory = useCallback(() => {
+    if (!activeUser) return;
+    if (activeStoryIndex < activeUser.stories.length - 1) {
+      setActiveStoryIndex(prev => prev + 1);
+    } else {
+      const currentUserIndex = statuses.findIndex(u => u.id === activeUser.id);
+      const nextUserIndex = (currentUserIndex + 1) % statuses.length;
+      handleSelectUser(statuses[nextUserIndex]);
+    }
+  }, [activeUser, activeStoryIndex, statuses]);
+
   const startTimer = useCallback(() => {
     if (!activeUser) return;
     
@@ -61,16 +74,24 @@ export default function StatusPage() {
 
     setProgress(0);
     clearInterval(progressTimerRef.current);
-    progressTimerRef.current = setInterval(() => {
-        setProgress(p => p + 10 / story.duration * 100);
-    }, 10);
+    const interval = setInterval(() => {
+        setProgress(p => {
+            if (p >= 100) {
+                clearInterval(interval);
+                return 100;
+            }
+            return p + 100 / (story.duration / 100);
+        });
+    }, 100);
+    progressTimerRef.current = interval;
+
 
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       handleNextStory();
     }, story.duration);
 
-  }, [activeUser, activeStoryIndex]);
+  }, [activeUser, activeStoryIndex, handleNextStory]);
 
   useEffect(() => {
     if (activeUser) {
@@ -100,15 +121,6 @@ export default function StatusPage() {
       handleSelectUser(statuses[prevUserIndex]);
   }
 
-  const handleNextStory = () => {
-    if (!activeUser) return;
-    if (activeStoryIndex < activeUser.stories.length - 1) {
-      setActiveStoryIndex(prev => prev + 1);
-    } else {
-      handleNextUser();
-    }
-  };
-
   const handlePrevStory = () => {
     if (!activeUser) return;
     if (activeStoryIndex > 0) {
@@ -129,6 +141,12 @@ export default function StatusPage() {
       setActiveUser(null);
   }
 
+  const handleAddStatus = () => {
+    // In a real app, this would open a modal to upload a new status.
+    // For now, it will just log to the console.
+    console.log("Add new status clicked");
+  }
+
   if (activeUser) {
       const activeStory = activeUser.stories[activeStoryIndex];
     return (
@@ -141,7 +159,7 @@ export default function StatusPage() {
                     className="object-cover"
                     data-ai-hint={activeStory.imageHint}
                 />
-                 <div className="absolute inset-x-0 top-0 p-3 z-20">
+                 <div className="absolute inset-x-0 top-0 p-3 z-20 bg-gradient-to-b from-black/50 to-transparent">
                     <div className="flex items-center gap-2 mb-2">
                         {activeUser.stories.map((_, index) => (
                            <Progress key={index} value={index < activeStoryIndex ? 100 : (index === activeStoryIndex ? progress : 0)} className="h-1 w-full bg-white/30" />
@@ -176,7 +194,7 @@ export default function StatusPage() {
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold font-headline">Status</h1>
-        <Button size="sm">
+        <Button size="sm" onClick={handleAddStatus}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add Status
         </Button>
       </div>
@@ -208,4 +226,3 @@ export default function StatusPage() {
     </div>
   );
 }
-
