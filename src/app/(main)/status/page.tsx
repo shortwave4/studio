@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef } from "react";
@@ -23,11 +22,12 @@ type Status = {
 // Create statuses from placeholder data
 const statusUsers = PlaceHolderImages.filter(p => p.id.startsWith('user-'));
 const mockStatuses: Status[] = statusUsers.map((user) => {
-    const statusImage = PlaceHolderImages.find(p => p.id === `status-${user.id.replace('user-', 'status-')}`);
+    // The status image ID should correspond to the user ID.
+    const statusImage = PlaceHolderImages.find(p => p.id === `status-${user.id}`);
     return {
         id: user.id,
-        name: user.id.charAt(0).toUpperCase() + user.id.slice(1).replace('-', ' '),
-        avatarUrl: `https://picsum.photos/seed/${user.id}/200`,
+        name: user.description, // Use description for name for more variety
+        avatarUrl: user.imageUrl,
         imageUrl: statusImage?.imageUrl || `https://picsum.photos/seed/status-${user.id}/400/600`,
         imageHint: statusImage?.imageHint || 'status update',
         hasNew: Math.random() > 0.5,
@@ -45,7 +45,7 @@ export default function StatusPage() {
   };
 
   return (
-    <div className="h-[calc(100vh_-_var(--header-height)_-_theme(spacing.16))] flex flex-col" style={{ '--header-height': '60px' } as React.CSSProperties}>
+    <div className="h-[calc(100vh_-_var(--header-height)_-_theme(spacing.8))] md:h-[calc(100vh_-_var(--header-height)_-_theme(spacing.12))] flex flex-col gap-4 md:gap-6" style={{ '--header-height': '60px' } as React.CSSProperties}>
        <Card className="glass flex-shrink-0">
          <CardContent className="p-4">
             <div className="flex justify-between items-center mb-4">
@@ -81,9 +81,9 @@ export default function StatusPage() {
          </CardContent>
        </Card>
 
-      <div className="flex-grow flex items-center justify-center p-4">
+      <div className="flex-grow flex items-center justify-center p-0 md:p-4">
         {selectedStatus ? (
-            <Card className="w-full max-w-sm bg-card aspect-[9/16] relative overflow-hidden shadow-2xl">
+            <Card className="w-full max-w-sm bg-card aspect-[9/16] relative overflow-hidden shadow-2xl h-full md:h-auto md:max-h-full rounded-none md:rounded-lg">
                  <Image
                   src={selectedStatus.imageUrl}
                   alt={`Status from ${selectedStatus.name}`}
