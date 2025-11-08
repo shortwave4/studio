@@ -160,8 +160,8 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !firestore) return;
 
-    const chatId = getChatId(user.uid, selectedChat.id);
-    const messagesCol = collection(firestore, 'chats', chatId, 'messages');
+    // const chatId = getChatId(user.uid, selectedChat.id);
+    // const messagesCol = collection(firestore, 'chats', chatId, 'messages');
     
     // Optimistic update
     const optimisticId = `optimistic-${Date.now()}`;
@@ -176,11 +176,11 @@ export default function ChatPage() {
 
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
 
-    addDocumentNonBlocking(messagesCol, {
-      text: newMessage,
-      senderId: user.uid,
-      timestamp: serverTimestamp(),
-    }).then(docRef => {
+    // addDocumentNonBlocking(messagesCol, {
+    //   text: newMessage,
+    //   senderId: user.uid,
+    //   timestamp: serverTimestamp(),
+    // }).then(docRef => {
         // This logic will kick in if we switch back to live data
         // For now, we manually simulate the sent status
         setTimeout(() => {
@@ -188,7 +188,7 @@ export default function ChatPage() {
                 msg.id === optimisticId ? { ...msg, status: 'sent' } : msg
             ));
         }, 1000);
-    });
+    // });
 
     setNewMessage('');
   };
