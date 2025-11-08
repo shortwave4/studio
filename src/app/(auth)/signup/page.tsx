@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import { updateProfile } from "firebase/auth";
+import { updateProfile, UserCredential, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -26,9 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase";
-import { initiateEmailSignUp } from "@/firebase/non-blocking-login";
 import { Flame } from "lucide-react";
-import { UserCredential } from "firebase/auth";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
