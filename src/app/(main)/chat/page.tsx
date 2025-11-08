@@ -9,8 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase";
-import { collection, query, where, orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
+import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase";
+import { collection, serverTimestamp, Timestamp } from "firebase/firestore";
 import type { UserProfile } from '@/types';
 
 type ChatContact = UserProfile & {
@@ -33,6 +33,14 @@ const mockContacts: ChatContact[] = [
   { userId: 'user2', name: 'Bob', bio: 'Coder and gamer', lastMessage: 'Sounds good!', lastMessageTime: '09:30', unread: 0 },
   { userId: 'user3', name: 'Charlie', bio: 'Foodie', lastMessage: 'I am on my way', lastMessageTime: 'Yesterday', unread: 5 },
   { userId: 'user4', name: 'Diana', bio: 'Musician', lastMessage: 'Next week?', lastMessageTime: 'Yesterday', unread: 0 },
+];
+
+const mockMessages: Omit<Message, 'own'>[] = [
+    { id: 'msg1', senderId: 'user1', text: 'Hey, how is it going?', timestamp: new Date(Date.now() - 1000 * 60 * 5) },
+    { id: 'msg2', senderId: 'currentUser', text: 'Hey Alice! I am doing great. How about you?', timestamp: new Date(Date.now() - 1000 * 60 * 4) },
+    { id: 'msg3', senderId: 'user1', text: 'Doing well, thanks! Just working on the new project.', timestamp: new Date(Date.now() - 1000 * 60 * 3) },
+    { id: 'msg4', senderId: 'currentUser', text: 'Nice! Anything exciting?', timestamp: new Date(Date.now() - 1000 * 60 * 2) },
+    { id: 'msg5', senderId: 'user1', text: 'Yeah, we are adding a new chat feature!', timestamp: new Date(Date.now() - 1000 * 60 * 1) },
 ];
 
 
@@ -62,22 +70,16 @@ export default function ChatPage() {
       // This state is handled by the main return's conditional rendering.
     }
   }, [contacts, isMobile, selectedChat]);
-
-  const messagesQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !selectedChat) return null;
-    const chatId = getChatId(user.uid, selectedChat.userId);
-    return query(collection(firestore, 'chats', chatId, 'messages'), orderBy('timestamp', 'asc'));
-  }, [firestore, user, selectedChat]);
   
-  const { data: messagesData } = useCollection<Omit<Message, 'own'>>(messagesQuery);
-
   const messages: Message[] = useMemo(() => {
-    if (!messagesData || !user) return [];
-    return messagesData.map(msg => ({
+    if (!selectedChat || !user) return [];
+    return mockMessages.map(msg => ({
       ...msg,
-      own: msg.senderId === user.uid,
+      own: msg.senderId === 'currentUser' || msg.senderId === user.uid,
+      // Replace senderId for display
+      senderId: msg.senderId === 'currentUser' ? user.uid : msg.senderId,
     }));
-  }, [messagesData, user]);
+  }, [selectedChat, user]);
 
 
   const handleSelectChat = (contact: ChatContact) => {
@@ -96,6 +98,10 @@ export default function ChatPage() {
       senderId: user.uid,
       timestamp: serverTimestamp()
     });
+
+    // NOTE: This will not appear in the UI as we are using mock data.
+    // In a real implementation, the `useCollection` hook would update the UI.
+    console.log("New message sent to Firestore (will not appear in mock UI):", newMessage);
 
     setNewMessage("");
   };
