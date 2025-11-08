@@ -23,7 +23,7 @@ type Status = {
 // Create statuses from placeholder data
 const statusUsers = PlaceHolderImages.filter(p => p.id.startsWith('user-'));
 const mockStatuses: Status[] = statusUsers.map((user) => {
-    const statusImage = PlaceHolderImages.find(p => p.id === `status-${user.id}`);
+    const statusImage = PlaceHolderImages.find(p => p.id === `status-${user.id.replace('user-', 'status-')}`);
     return {
         id: user.id,
         name: user.id.charAt(0).toUpperCase() + user.id.slice(1).replace('-', ' '),
