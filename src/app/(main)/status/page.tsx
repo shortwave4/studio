@@ -1,7 +1,7 @@
-
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,7 +68,12 @@ export default function StatusPage() {
       <div className="flex-grow flex items-center justify-center">
         {selectedStatus ? (
             <Card className="w-full max-w-md bg-gradient-animation text-primary-foreground aspect-[9/16] relative overflow-hidden">
-                <AvatarImage src={selectedStatus.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-50"/>
+                <Image 
+                  src={selectedStatus.imageUrl} 
+                  alt={`Status from ${selectedStatus.name}`}
+                  fill
+                  className="absolute inset-0 w-full h-full object-cover opacity-50"
+                />
                 <div className="relative z-10 flex flex-col justify-between h-full p-6 bg-black/20">
                      <div>
                         <div className="flex items-center gap-3">
