@@ -79,6 +79,20 @@ export default function ChatPage() {
     // When a new chat is selected, clear optimistic messages
     setOptimisticMessages([]);
   }, [selectedChat]);
+  
+  // Update optimistic messages once they arrive from Firestore
+  useEffect(() => {
+    if (!messagesData) return;
+    const sentMessageIds = messagesData.map(m => m.id);
+    const newOptimisticMessages = optimisticMessages.filter(
+      optMsg => !sentMessageIds.includes(optMsg.id)
+    );
+    if (newOptimisticMessages.length < optimisticMessages.length) {
+      setOptimisticMessages(newOptimisticMessages);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messagesData]);
+
 
   const messages: Message[] = useMemo(() => {
     if (!user) return [];
@@ -107,17 +121,6 @@ export default function ChatPage() {
         combinedMessages.push(optMsg);
       }
     });
-  
-    // Update optimistic messages once they arrive from Firestore
-    useEffect(() => {
-      const sentMessageIds = messagesData?.map(m => m.id) || [];
-      const newOptimisticMessages = optimisticMessages.filter(
-        optMsg => !sentMessageIds.includes(optMsg.id)
-      );
-      if(newOptimisticMessages.length < optimisticMessages.length) {
-        setOptimisticMessages(newOptimisticMessages);
-      }
-    }, [messagesData]);
   
     return combinedMessages;
   }, [messagesData, optimisticMessages, user, selectedChat]);
@@ -382,5 +385,7 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
 
     
