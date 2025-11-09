@@ -39,16 +39,18 @@ export default function DiscoverUsers() {
           return;
         }
 
+        const validUsers = usersCollection.data.filter(u => u.id && u.name && u.email);
+
         if (latitude && longitude) {
             const suggestions = await suggestUsersByLocation({
               latitude,
               longitude,
-              users: usersCollection.data,
+              users: validUsers,
             });
             const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
             setSuggestedUsers(filteredUsers);
         } else {
-             const filteredUsers = usersCollection.data.filter((u) => u.id !== user?.uid);
+             const filteredUsers = validUsers.filter((u) => u.id !== user?.uid);
              setSuggestedUsers(filteredUsers);
         }
       } catch (error) {

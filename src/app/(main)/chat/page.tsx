@@ -78,10 +78,11 @@ export default function ChatPage() {
       if (allUsersLoading || !allUsers) return;
       setUsersLoading(true);
       try {
+        const validUsers = allUsers.filter(u => u.id && u.name && u.email);
         const suggestions = await suggestUsersByLocation({
           latitude: 37.7749,
           longitude: -122.4194,
-          users: allUsers,
+          users: validUsers,
         });
         const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
         setContacts(filteredUsers as UserProfile[]);
