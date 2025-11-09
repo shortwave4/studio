@@ -45,7 +45,7 @@ import type { UserProfile } from '@/types';
 import type { ChatContact, Message } from '@/types/chat';
 import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
-import { WithId } from '@/firebase/firestore/use-collection';
+import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { useMemoFirebase } from '@/firebase/provider';
 
 function getChatId(uid1: string, uid2: string) {
@@ -118,9 +118,11 @@ export default function ChatPage() {
     return collection(firestore, 'chats', chatId, 'messages');
   }, [firestore, chatId]);
 
-  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesCollection, {
+  const messageCollectionOptions = useMemo<CollectionOptions>(() => ({
     orderBy: ['timestamp', 'asc']
-  });
+  }), []);
+
+  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesCollection, messageCollectionOptions);
 
   const messages: Message[] = useMemo(() => {
     if (!messagesData) return [];
