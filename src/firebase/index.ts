@@ -26,16 +26,8 @@ export function initializeFirebase() {
   let firebaseApp: FirebaseApp;
   // Check if any app is already initialized
   if (getApps().length === 0) {
-    try {
-      // Firebase App Hosting automatically provides config
-      firebaseApp = initializeApp();
-    } catch (e) {
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-      }
-      // Fallback to local config for development or if auto-init fails
-      firebaseApp = initializeApp(firebaseConfig);
-    }
+    // If not, initialize a new app
+    firebaseApp = initializeApp(firebaseConfig);
   } else {
     // If apps are already initialized, get the default app
     firebaseApp = getApp();
