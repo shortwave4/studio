@@ -10,8 +10,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import type { UserProfile } from '@/types';
-import { GeoPoint } from 'firebase/firestore';
 
 // Haversine distance formula to calculate distance between two points on Earth
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -27,6 +25,10 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   return distance;
 }
 
+const CoordinatesSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
+});
 
 const UserProfileSchema = z.object({
     id: z.string(),
@@ -34,7 +36,7 @@ const UserProfileSchema = z.object({
     name: z.string(),
     email: z.string(),
     bio: z.string().optional(),
-    coordinates: z.custom<GeoPoint>((val) => val instanceof GeoPoint).nullable().optional(),
+    coordinates: CoordinatesSchema.nullable().optional(),
 });
 
 const SuggestUsersByLocationInputSchema = z.object({

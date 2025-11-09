@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, GeoPoint, query, where, limit } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import {
   Card,
@@ -42,10 +42,15 @@ export default function DiscoverUsers() {
         const validUsers = usersCollection.data.filter(u => u.id && u.name && u.email);
 
         if (latitude && longitude) {
+            const plainUsers = validUsers.map(u => ({
+              ...u,
+              coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null
+            }));
+
             const suggestions = await suggestUsersByLocation({
               latitude,
               longitude,
-              users: validUsers,
+              users: plainUsers,
             });
             const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
             setSuggestedUsers(filteredUsers);
