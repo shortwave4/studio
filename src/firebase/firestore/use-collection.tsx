@@ -9,6 +9,13 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
+  query,
+  orderBy as firestoreOrderBy,
+  limit as firestoreLimit,
+  startAfter as firestoreStartAfter,
+  endBefore as firestoreEndBefore,
+  where as firestoreWhere,
+  QueryConstraint
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -16,6 +23,16 @@ import { useMemoFirebase } from '@/firebase/provider';
 
 /** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
+
+type OrderBy = [string, 'asc' | 'desc'];
+
+export interface CollectionOptions {
+    orderBy?: OrderBy | OrderBy[];
+    limit?: number;
+    startAfter?: any;
+    endBefore?: any;
+    where?: [string, any, any] | [string, any, any][];
+}
 
 /**
  * Interface for the return value of the useCollection hook.
@@ -54,7 +71,8 @@ export interface InternalQuery extends Query<DocumentData> {
  * @returns {UseCollectionResult<T>} Object with data, isLoading, error.
  */
 export function useCollection<T = any>(
-    memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>))  | null | undefined,
+    targetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>))  | null | undefined,
+    options?: CollectionOptions
 ): UseCollectionResult<T> {
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
@@ -63,8 +81,49 @@ export function useCollection<T = any>(
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  const memoizedQuery = useMemoFirebase(() => {
+    if (!targetRefOrQuery) return null;
+
+    const constraints: QueryConstraint[] = [];
+
+    if (options?.orderBy) {
+        if (Array.isArray(options.orderBy[0])) {
+            (options.orderBy as OrderBy[]).forEach(ob => {
+                constraints.push(firestoreOrderBy(ob[0], ob[1]));
+            });
+        } else {
+            const ob = options.orderBy as OrderBy;
+            constraints.push(firestoreOrderBy(ob[0], ob[1]));
+        }
+    }
+
+     if (options?.where) {
+        if (Array.isArray(options.where[0])) {
+            (options.where as [string, any, any][]).forEach(w => {
+                constraints.push(firestoreWhere(w[0], w[1], w[2]));
+            });
+        } else {
+            const w = options.where as [string, any, any];
+            constraints.push(firestoreWhere(w[0], w[1], w[2]));
+        }
+    }
+    
+    if (options?.startAfter) {
+      constraints.push(firestoreStartAfter(options.startAfter));
+    }
+    if (options?.endBefore) {
+      constraints.push(firestoreEndBefore(options.endBefore));
+    }
+     if (options?.limit) {
+      constraints.push(firestoreLimit(options.limit));
+    }
+
+    return constraints.length > 0 ? query(targetRefOrQuery, ...constraints) : targetRefOrQuery;
+  }, [targetRefOrQuery, options]);
+
+
   useEffect(() => {
-    if (!memoizedTargetRefOrQuery) {
+    if (!memoizedQuery) {
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -74,9 +133,8 @@ export function useCollection<T = any>(
     setIsLoading(true);
     setError(null);
 
-    // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
     const unsubscribe = onSnapshot(
-      memoizedTargetRefOrQuery,
+      memoizedQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
         const results: ResultItemType[] = [];
         for (const doc of snapshot.docs) {
@@ -87,11 +145,10 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        // This logic extracts the path from either a ref or a query
         const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+          memoizedQuery.type === 'collection'
+            ? (memoizedQuery as CollectionReference).path
+            : (memoizedQuery as unknown as InternalQuery)._query.path.canonicalString()
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',
@@ -102,15 +159,12 @@ export function useCollection<T = any>(
         setData(null)
         setIsLoading(false)
 
-        // trigger global error propagation
         errorEmitter.emit('permission-error', contextualError);
       }
     );
 
     return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
+  }, [memoizedQuery]); 
 
   return { data, isLoading, error };
 }
-
-    

@@ -1,4 +1,5 @@
 
+
 export type UserProfile = {
     id: string; 
     userId: string;
@@ -10,3 +11,13 @@ export type UserProfile = {
         longitude: number;
     }
 };
+
+export type AffiliateProduct = {
+    id: string;
+    name: string;
+    description: string;
+    imageUrl: string;
+    affiliateLink: string;
+    adminId: string;
+};
+
