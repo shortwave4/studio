@@ -40,6 +40,13 @@
           "type": "string",
           "description": "Timestamp of the user's last activity.",
           "format": "date-time"
+        },
+        "fcmTokens": {
+          "type": "array",
+          "description": "An array of Firebase Cloud Messaging (FCM) tokens for the user's devices.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -359,3 +366,5 @@
     "reasoning": "This Firestore data structure is designed to support ConnectSphere's features (chat, status, profiles, affiliate products, location-based suggestions) while adhering to the core design principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs.  \n\n**Authorization Independence:** Achieved by denormalizing authorization data. For example, the `ChatGroup` documents would contain a `members` map rather than relying on a separate subcollection or document lookup.  This allows rules to validate membership without costly `get()` operations.\n\n**Structural Segregation:** Different data types with different access requirements are stored in separate collections. User profiles are stored under `/users/{userId}` for private data, while affiliate products are stored in `/affiliate_products` for admin management.\n\n**Access Modeling:** Path-based ownership is used for user-owned data like profiles (`/users/{userId}/profile`). Collaborative data (chat groups) uses the membership map model (`members: {uid: role}`). Affiliate products are globally accessible but only creatable/editable by admins (determined by checking for the existence of `/roles_admin/{uid}`).\n\n**QAPs Support:** Secure `list` operations are supported by avoiding rules that filter data based on document content. Instead, we use structural segregation. For example listing chat messages within a chat group does not require any filtering based on the current user. The rules simply check if the user is a member of the group (via the denormalized members map). Also, affiliate products are stored in their own collection and thus listing all products is allowed.\n\n**Realtime Database Considerations:** The prompt requested Firebase Realtime Database.  While this structure is optimized for Firestore, similar principles could be applied to Realtime Database. However, authorization in Realtime Database typically involves custom claims, which this design avoids.\n\n**Cloudinary and Firebase Storage:** The data structure supports storing media URLs, allowing links to both Cloudinary (for chat) and Firebase Storage (for status)."
   }
 }
+
+    

@@ -22,6 +22,7 @@ export default function SettingsPage() {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -30,7 +31,10 @@ export default function SettingsPage() {
       // For now, we'll use a placeholder.
       setBio("Loves hiking and photography.");
     }
-    setPushEnabled(Notification.permission === 'granted');
+    // Check initial notification permission status
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushEnabled(Notification.permission === 'granted');
+    }
   }, [user]);
 
   const handleSaveChanges = async () => {
@@ -42,7 +46,7 @@ export default function SettingsPage() {
       });
       return;
     }
-
+    setIsSaving(true);
     try {
       // Update display name in Firebase Auth
       await updateProfile(auth.currentUser, { displayName: name });
@@ -62,20 +66,25 @@ export default function SettingsPage() {
         title: "Uh oh! Something went wrong.",
         description: "Could not save your profile. Please try again.",
       });
+    } finally {
+        setIsSaving(false);
     }
   };
 
   const handlePushToggle = async (checked: boolean) => {
+    if (!user) return;
+
     if (checked) {
-      const token = await requestPermission();
+      const token = await requestPermission(firestore, user.uid);
       if (token) {
         setPushEnabled(true);
-        // You'd save the token to your server here
         toast({
           title: "Notifications Enabled",
           description: "You will now receive push notifications.",
         });
       } else {
+         // The user denied permission, so we switch it back off.
+        setPushEnabled(false);
          toast({
           variant: "destructive",
           title: "Permission Denied",
@@ -84,8 +93,10 @@ export default function SettingsPage() {
       }
     } else {
       // In a real app, you would have logic here to revoke the token on your server.
+      // For now, we'll just update the UI.
       setPushEnabled(false);
-      console.log("Push notifications disabled.");
+      console.log("Push notifications disabled by user toggle.");
+      // We don't show a toast here to avoid being too noisy.
     }
   };
 
@@ -170,7 +181,7 @@ export default function SettingsPage() {
                   Receive notifications on your device.
                 </p>
               </div>
-              <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} />
+              <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} aria-readonly={isSaving} />
             </div>
              <div className="flex items-center justify-between">
               <div>
@@ -185,9 +196,13 @@ export default function SettingsPage() {
         </Card>
 
         <div className="flex justify-end">
-            <Button onClick={handleSaveChanges} className="bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
         </div>
       </div>
     </div>
   );
 }
+
+    
