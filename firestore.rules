@@ -17,7 +17,7 @@ service cloud.firestore {
 
       // Rules for user status updates subcollection
       match /status_updates/{statusId} {
-        // Any authenticated user can read status updates.
+        // Any authenticated user can read (get, list) status updates.
         allow read: if request.auth != null;
         // A user can only create, update, or delete their own status updates.
         allow write: if request.auth != null && request.auth.uid == userId;
@@ -52,13 +52,13 @@ service cloud.firestore {
       allow update: if request.auth != null && resource.data.creatorId == request.auth.uid;
        // Any authenticated user can create a new group.
       allow create: if request.auth != null;
-    }
 
-    // Rules for messages within a chat group
-    match /chat_groups/{groupId}/messages/{messageId} {
-        // A user can read/write messages in a group if they are a member.
-        // This is checked by getting the group document and verifying membership.
-        allow read, write: if request.auth != null && get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+      // Rules for messages within a chat group
+      match /messages/{messageId} {
+          // A user can read/write messages in a group if they are a member.
+          // This is checked by getting the group document and verifying membership.
+          allow read, write: if request.auth != null && get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+      }
     }
   }
 }
