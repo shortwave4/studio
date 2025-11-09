@@ -42,6 +42,15 @@ export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  });
+
   const saveProfileWithLocation = (user: any, name: string, email: string) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
