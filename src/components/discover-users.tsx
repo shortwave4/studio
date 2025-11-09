@@ -34,7 +34,7 @@ export default function DiscoverUsers() {
           longitude: longitude || -122.4194,
         });
         // Filter out the current user from the suggestions
-        const filteredSuggestions = suggestions.filter(u => u.id !== user?.uid);
+        const filteredSuggestions = suggestions.filter(u => u.userId !== user?.uid);
         setSuggestedUsers(filteredSuggestions.slice(0, 8)); // Limit to 8 for demo
       } catch (aiError) {
         console.error("AI suggestion failed:", aiError);
@@ -91,7 +91,7 @@ export default function DiscoverUsers() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
         {Array.from({ length: 8 }).map((_, i) => (
            <Card
-            key={i}
+            key={`skeleton-${i}`}
             className="text-center shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-xl overflow-hidden bg-card"
           >
             <div className="relative h-24 bg-gradient-to-b from-primary/20 via-primary/5 to-transparent">
@@ -117,14 +117,14 @@ export default function DiscoverUsers() {
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
       {suggestedUsers.map((user) => (
         <Card
-          key={user.id}
+          key={user.userId}
           className="text-center shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-xl overflow-hidden bg-card"
         >
           <div className="relative h-24 bg-gradient-to-b from-primary/20 via-primary/5 to-transparent">
              <div className='absolute -bottom-12 left-1/2 -translate-x-1/2'>
                 <Avatar className="w-24 h-24 border-4 border-card bg-background ring-1 ring-border">
                     <AvatarImage
-                    src={`https://picsum.photos/seed/${user.id}/200/200`}
+                    src={`https://picsum.photos/seed/${user.userId}/200/200`}
                     alt={user.name}
                     data-ai-hint="person portrait"
                     />
