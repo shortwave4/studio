@@ -19,7 +19,6 @@ service cloud.firestore {
       // Rules for the status_updates sub-collection
       match /status_updates/{statusId} {
         // Allow any authenticated user to read (get, list) status updates.
-        // This rule on the subcollection path allows list operations on 'status_updates'.
         allow read: if request.auth != null;
         // A user can only create, update, or delete their own status updates.
         allow write: if request.auth.uid == userId;
