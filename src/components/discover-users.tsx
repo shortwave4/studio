@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -60,13 +61,21 @@ export default function DiscoverUsers() {
             setIsSuggesting(false);
           }
         },
-        (error) => {
-          console.error("Geolocation error:", error);
-          toast({
-            variant: "destructive",
-            title: "Location Access Denied",
-            description: "Showing all users as location access was denied.",
-          });
+        (error: GeolocationPositionError) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            toast({
+              variant: 'destructive',
+              title: 'Location Access Denied',
+              description: 'Showing all users as location access was denied.',
+            });
+          } else {
+            console.error('Geolocation error:', error.message);
+            toast({
+              variant: 'destructive',
+              title: 'Location Error',
+              description: 'Could not retrieve location. Showing all users.',
+            });
+          }
           setSuggestedUsers(users || []);
           setIsSuggesting(false);
         }
