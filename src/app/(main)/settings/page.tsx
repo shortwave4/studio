@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useUser, useAuth, useFirestore, setDocumentNonBlocking, requestPermission } from "@/firebase";
 import { updateProfile } from "firebase/auth";
 import { doc } from "firebase/firestore";
@@ -12,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { BellRing } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -80,7 +82,7 @@ export default function SettingsPage() {
         setPushEnabled(true);
         toast({
           title: "Notifications Enabled",
-          description: "You will now receive push notifications.",
+          description: "You will now receive push notifications for direct messages.",
         });
       } else {
          // The user denied permission, so we switch it back off.
@@ -176,9 +178,9 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Push Notifications</Label>
+                <Label>Push Notifications (FCM)</Label>
                 <p className="text-sm text-muted-foreground">
-                  Receive notifications on your device.
+                  Receive notifications for chats and direct messages.
                 </p>
               </div>
               <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} aria-readonly={isSaving} />
@@ -187,10 +189,24 @@ export default function SettingsPage() {
               <div>
                 <Label>Email Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Receive notifications via email.
+                  Receive important notifications via email.
                 </p>
               </div>
-              <Switch />
+              <Switch disabled />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Broadcast Notifications (PushAll)</Label>
+                <p className="text-sm text-muted-foreground">
+                  Subscribe to receive broadcast messages from the admin.
+                </p>
+              </div>
+              <Button asChild variant="outline">
+                <Link href="https://pushall.ru/?fs=5965" target="_blank">
+                  <BellRing className="mr-2 h-4 w-4" />
+                  Subscribe
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -204,5 +220,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
