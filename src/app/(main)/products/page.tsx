@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ExternalLink, PlusCircle } from "lucide-react";
 import { useAdmin } from "@/hooks/use-admin";
 import { AddProductDialog } from "@/components/add-product-dialog";
-import { useCollection } from "@/firebase";
+import { useCollection, useMemoFirebase } from "@/firebase";
 import { collection } from "firebase/firestore";
 import { useFirestore } from "@/firebase/provider";
 import type { AffiliateProduct } from "@/types";
@@ -15,7 +15,7 @@ import type { AffiliateProduct } from "@/types";
 export default function ProductsPage() {
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
   const firestore = useFirestore();
-  const productsCollection = collection(firestore, 'affiliate_products');
+  const productsCollection = useMemoFirebase(() => collection(firestore, 'affiliate_products'), [firestore]);
   const { data: products, isLoading: productsLoading } = useCollection<AffiliateProduct>(productsCollection);
 
   const isLoading = isAdminLoading || productsLoading;
@@ -90,4 +90,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-

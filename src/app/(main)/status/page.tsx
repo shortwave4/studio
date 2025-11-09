@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore, useCollection } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where, Timestamp, getDocs } from "firebase/firestore";
 
 type StatusStory = {
@@ -36,10 +36,8 @@ export default function StatusPage() {
   const timerRef = useRef<NodeJS.Timeout>();
   const progressTimerRef = useRef<NodeJS.Timeout>();
   
-  // 1. Fetch all users
-  const { data: users, isLoading: usersLoading } = useCollection(
-    collection(firestore, 'users')
-  );
+  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: users, isLoading: usersLoading } = useCollection(usersCollectionRef);
 
   // 2. For each user, fetch their status updates from the last 24 hours
   const [statuses, setStatuses] = useState<StatusUser[]>([]);
