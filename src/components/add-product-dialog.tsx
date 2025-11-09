@@ -32,6 +32,7 @@ import { collection } from 'firebase/firestore';
 const productSchema = z.object({
   name: z.string().min(3, 'Product name must be at least 3 characters.'),
   description: z.string().min(10, 'Description must be at least 10 characters.'),
+  category: z.string().min(2, 'Category must be at least 2 characters.'),
   imageUrl: z.string().url('Please enter a valid image URL.'),
   affiliateLink: z.string().url('Please enter a valid affiliate link.'),
 });
@@ -49,6 +50,7 @@ export function AddProductDialog({ children }: { children: React.ReactNode }) {
     defaultValues: {
       name: '',
       description: '',
+      category: '',
       imageUrl: '',
       affiliateLink: '',
     },
@@ -116,6 +118,19 @@ export function AddProductDialog({ children }: { children: React.ReactNode }) {
                       className="resize-none"
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Electronics" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

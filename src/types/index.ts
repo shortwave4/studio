@@ -14,6 +14,7 @@ export type AffiliateProduct = {
     id: string;
     name: string;
     description: string;
+    category: string;
     imageUrl: string;
     affiliateLink: string;
     adminId: string;
