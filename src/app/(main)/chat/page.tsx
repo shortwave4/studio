@@ -158,7 +158,7 @@ export default function ChatPage() {
 
   const handleSendMessage = (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat || !user || !firestore) return;
+    if (!newMessage.trim() || !selectedChat || !user) return;
 
     // const chatId = getChatId(user.uid, selectedChat.id);
     // const messagesCol = collection(firestore, 'chats', chatId, 'messages');
@@ -176,6 +176,7 @@ export default function ChatPage() {
 
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
 
+    // This part is commented out to prevent permission errors
     // addDocumentNonBlocking(messagesCol, {
     //   text: newMessage,
     //   senderId: user.uid,
@@ -359,10 +360,7 @@ export default function ChatPage() {
   );
 
   return (
-    <div
-      className="h-[calc(100vh_-_var(--header-height)_-_theme(spacing.16))] flex flex-col"
-      style={{ '--header-height': '60px' } as React.CSSProperties}
-    >
+    <div className="h-full flex flex-col">
       <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass h-full">
         {isMobile ? (
           selectedChat ? (
@@ -394,5 +392,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
