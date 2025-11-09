@@ -33,7 +33,7 @@ import {
   Mic,
   SendHorizonal,
   ArrowLeft,
-  Image as ImageIcon,
+  ImageIcon,
   Square,
   CircleDotDashed,
 } from 'lucide-react';
@@ -517,3 +517,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
