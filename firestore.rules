@@ -5,16 +5,10 @@ service cloud.firestore {
 
     // Rules for user profiles
     match /users/{userId} {
-      // Any authenticated user can view any other user's profile.
-      allow get: if request.auth != null;
+      // Any authenticated user can read (get, list) user profiles.
+      allow read: if request.auth != null;
       // A user can only create, update, or delete their own profile data.
       allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Allow authenticated users to list all users, which is necessary for
-    // discover and chat features.
-    match /users {
-        allow list: if request.auth != null;
     }
 
     // Rules for private chat messages
