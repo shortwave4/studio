@@ -33,7 +33,9 @@ import {
   Mic,
   SendHorizonal,
   ArrowLeft,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Square,
+  CircleDotDashed,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -57,12 +59,15 @@ export default function ChatPage() {
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -113,16 +118,25 @@ export default function ChatPage() {
   }, [messagesData, user?.uid]);
 
   const getLastMessage = (contactId: string): { text: string; time: string } => {
-    // This is a mock implementation since we don't have a direct query for the last message
-    // In a real app, you might store the last message on the contact/chat document itself.
-    const lastMsg = messagesData?.slice().reverse().find(m => 
-        (m.senderId === user?.uid && getChatId(m.senderId, contactId) === chatId) ||
-        (m.senderId === contactId && getChatId(m.senderId, user?.uid || '') === chatId)
-    );
+    const relevantMessages = messagesData?.filter(m => getChatId(m.senderId, contactId) === getChatId(user!.uid, contactId));
+    const lastMsg = relevantMessages?.[relevantMessages.length - 1];
   
     if (lastMsg) {
+      let text = 'Click to start chatting!';
+      switch (lastMsg.messageType) {
+        case 'image':
+          text = 'Photo';
+          break;
+        case 'audio':
+          text = 'Audio message';
+          break;
+        case 'text':
+        default:
+          text = lastMsg.text;
+          break;
+      }
       return {
-        text: lastMsg.mediaUrl ? 'Photo' : lastMsg.text,
+        text: text,
         time: getTimeString(lastMsg.timestamp)
       };
     }
@@ -173,25 +187,13 @@ export default function ChatPage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0 || !storage || !user || !messagesCollection) {
+  const uploadMedia = async (file: Blob, fileName: string, type: 'image' | 'audio') => {
+    if (!storage || !user || !messagesCollection || !chatId) {
       return;
     }
-
-    const file = event.target.files[0];
-    if (!file.type.startsWith('image/')) {
-        toast({
-            variant: "destructive",
-            title: "Invalid File Type",
-            description: "Please select an image file."
-        });
-        return;
-    }
-
     setIsUploading(true);
-
     try {
-      const storageRef = ref(storage, `chat_media/${chatId}/${Date.now()}_${file.name}`);
+      const storageRef = ref(storage, `chat_media/${chatId}/${Date.now()}_${fileName}`);
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
 
@@ -199,7 +201,7 @@ export default function ChatPage() {
         text: '',
         senderId: user.uid,
         timestamp: serverTimestamp(),
-        messageType: 'image',
+        messageType: type,
         mediaUrl: downloadURL,
       });
 
@@ -216,6 +218,61 @@ export default function ChatPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  }
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) {
+      return;
+    }
+
+    const file = event.target.files[0];
+    if (!file.type.startsWith('image/')) {
+        toast({
+            variant: "destructive",
+            title: "Invalid File Type",
+            description: "Please select an image file."
+        });
+        return;
+    }
+    
+    uploadMedia(file, file.name, 'image');
+  };
+
+  const handleStartRecording = async () => {
+    if (isRecording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        uploadMedia(audioBlob, 'voice-message.webm', 'audio');
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Could not start recording:", error);
+      toast({
+        variant: "destructive",
+        title: "Recording Error",
+        description: "Could not access microphone. Please check permissions."
+      })
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
     }
   };
 
@@ -338,15 +395,19 @@ export default function ChatPage() {
                 <div
                   className={cn(
                     'rounded-lg p-3 text-sm',
+                     msg.messageType !== 'audio' && 'p-3',
+                     msg.messageType === 'audio' && 'p-2',
                     msg.own
                       ? 'bg-primary text-primary-foreground rounded-br-none'
                       : 'bg-muted rounded-bl-none'
                   )}
                 >
-                  {msg.messageType === 'image' && msg.mediaUrl ? (
+                   {msg.messageType === 'image' && msg.mediaUrl ? (
                     <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
                       <Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/>
                     </a>
+                  ) : msg.messageType === 'audio' && msg.mediaUrl ? (
+                    <audio controls src={msg.mediaUrl} className="max-w-full h-10" />
                   ) : (
                     <p>{msg.text}</p>
                   )}
@@ -372,7 +433,7 @@ export default function ChatPage() {
                  <div className="rounded-lg p-3 text-sm bg-primary text-primary-foreground rounded-br-none">
                    <div className="flex items-center gap-2">
                      <ImageIcon className="w-4 h-4 animate-pulse" />
-                     <p>Uploading image...</p>
+                     <p>Uploading...</p>
                    </div>
                  </div>
                </div>
@@ -385,25 +446,35 @@ export default function ChatPage() {
       <div className="p-4 border-t">
         <form onSubmit={handleSendMessage} className="relative">
           <Input
-            placeholder="Type a message..."
+            placeholder={isRecording ? "Recording..." : "Type a message..."}
             className="pr-28"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            disabled={!selectedChat || isUploading}
+            disabled={!selectedChat || isUploading || isRecording}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-            <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading}>
+            <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading || isRecording}>
               <Paperclip className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon" type="button" disabled>
-              <Mic className="w-5 h-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              type="button"
+              onMouseDown={handleStartRecording}
+              onMouseUp={handleStopRecording}
+              onTouchStart={handleStartRecording}
+              onTouchEnd={handleStopRecording}
+              className={cn(isRecording && "text-red-500")}
+              disabled={!selectedChat || isUploading}
+            >
+               {isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </Button>
             <Button
               size="icon"
               className="bg-accent hover:bg-accent/90"
               type="submit"
-              disabled={!selectedChat || !newMessage.trim() || isUploading}
+              disabled={!selectedChat || !newMessage.trim() || isUploading || isRecording}
             >
               <SendHorizonal className="w-5 h-5" />
             </Button>

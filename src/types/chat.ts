@@ -15,6 +15,6 @@ export type Message = {
   timestamp?: Timestamp | Date;
   own: boolean;
   status?: 'sending' | 'sent' | 'failed';
-  messageType: 'text' | 'image' | 'video' | 'file';
+  messageType: 'text' | 'image' | 'video' | 'file' | 'audio';
   mediaUrl?: string | null;
 };
