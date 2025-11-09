@@ -21,20 +21,23 @@ export default function ProductsPage() {
   const { data: products, isLoading: productsLoading } = useCollection<AffiliateProduct>(productsCollection);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>("All");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const isLoading = isAdminLoading || productsLoading;
 
   const categories = useMemo(() => {
     if (!products) return [];
-    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean) as string[])];
-    return ["All", ...uniqueCategories];
+    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    if (uniqueCategories.length > 0) {
+        return ["All", ...uniqueCategories];
+    }
+    return [];
   }, [products]);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     return products.filter(product => {
-      const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
+      const matchesCategory = selectedCategory === null || selectedCategory === "All" || product.category === selectedCategory;
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesCategory && matchesSearch;
     });
@@ -68,18 +71,20 @@ export default function ProductsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-2">
-            {categories.map(category => (
-                <Button 
-                    key={category}
-                    variant={selectedCategory === category ? "default" : "outline"}
-                    onClick={() => setSelectedCategory(category)}
-                    className="whitespace-nowrap"
-                >
-                    {category}
-                </Button>
-            ))}
-        </div>
+        {categories.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                {categories.map(category => (
+                    <Button 
+                        key={category}
+                        variant={selectedCategory === category || (selectedCategory === null && category === "All") ? "default" : "outline"}
+                        onClick={() => setSelectedCategory(category === "All" ? null : category)}
+                        className="whitespace-nowrap"
+                    >
+                        {category}
+                    </Button>
+                ))}
+            </div>
+        )}
       </div>
 
        {isLoading ? (
