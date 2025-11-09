@@ -44,5 +44,3 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     return null;
   }
 };
-
-    
