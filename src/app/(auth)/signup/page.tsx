@@ -8,7 +8,7 @@ import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
-import geofirestore from 'geofirestore';
+const geofirestore = require('geofirestore');
 
 
 import { Button } from "@/components/ui/button";
@@ -44,15 +44,6 @@ export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const Geofirestore = geofirestore.Geofirestore;
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-    },
-  });
 
   const saveProfileWithLocation = (user: any, name: string, email: string) => {
     if (navigator.geolocation) {

@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, limit, Query } from 'firebase/firestore';
-import geofirestore from 'geofirestore';
+const geofirestore = require('geofirestore');
 import type { UserProfile } from '@/types';
 import {
   Card,
@@ -113,7 +113,7 @@ export default function DiscoverUsers() {
       });
       fetchWithoutLocation();
     }
-  }, [user?.uid, firestore, toast, Geofirestore]);
+  }, [user?.uid, firestore, Geofirestore]);
 
 
   const handleStartChat = () => {
