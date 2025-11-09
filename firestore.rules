@@ -16,8 +16,8 @@ service cloud.firestore {
       // Allow a user to write only to their own profile.
       allow write: if request.auth.uid == userId;
 
-      // Rules for the status_updates sub-collection
-      // Allow any authenticated user to read status updates (get and list).
+      // Allow any authenticated user to read status updates.
+      // This includes listing all statuses for any user, which is required by the status page.
       match /status_updates/{statusId} {
         allow read: if request.auth != null;
         // A user can only create, update, or delete their own status updates.
