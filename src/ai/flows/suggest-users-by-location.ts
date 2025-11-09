@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to suggest users based on location.
@@ -10,6 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import type { UserProfile } from '@/types';
+import { GeoPoint } from 'firebase/firestore';
 
 // Haversine distance formula to calculate distance between two points on Earth
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -32,11 +34,7 @@ const UserProfileSchema = z.object({
     name: z.string(),
     email: z.string(),
     bio: z.string().optional(),
-    location: z.object({
-        latitude: z.number(),
-        longitude: z.number()
-    }).nullable(),
-    g: z.string().nullable(),
+    coordinates: z.custom<GeoPoint>((val) => val instanceof GeoPoint).nullable().optional(),
 });
 
 const SuggestUsersByLocationInputSchema = z.object({
@@ -64,8 +62,8 @@ const suggestUsersByLocationFlow = ai.defineFlow(
     const { latitude, longitude, users } = input;
 
     const sortedUsers = users.sort((a, b) => {
-      const locationA = a.location;
-      const locationB = b.location;
+      const locationA = a.coordinates;
+      const locationB = b.coordinates;
 
       if (locationA && locationB) {
         const distanceA = getDistance(latitude, longitude, locationA.latitude, locationA.longitude);

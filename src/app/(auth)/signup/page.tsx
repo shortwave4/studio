@@ -8,8 +8,6 @@ import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
-const geofirestore = require('geofirestore');
-
 
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +41,6 @@ export default function SignupPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-  const Geofirestore = geofirestore.Geofirestore;
 
   const saveProfileWithLocation = (user: any, name: string, email: string) => {
     if (navigator.geolocation) {
@@ -54,8 +51,7 @@ export default function SignupPage() {
             id: user.uid,
             name,
             email,
-            location: new GeoPoint(latitude, longitude),
-            g: geofirestore.geohashForLocation([latitude, longitude])
+            coordinates: new GeoPoint(latitude, longitude),
           };
           const userRef = doc(firestore, "users", user.uid);
           setDocumentNonBlocking(userRef, userProfile, { merge: true });
@@ -76,8 +72,7 @@ export default function SignupPage() {
         id: user.uid,
         name,
         email,
-        location: null,
-        g: null
+        coordinates: null,
       };
       const userRef = doc(firestore, "users", user.uid);
       setDocumentNonBlocking(userRef, userProfile, { merge: true });

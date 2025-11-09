@@ -7,8 +7,7 @@ export type UserProfile = {
     name: string;
     email: string;
     bio?: string;
-    location?: GeoPoint | null;
-    g?: string | null; // geohash for location
+    coordinates?: GeoPoint | null;
 };
 
 export type AffiliateProduct = {
@@ -19,4 +18,3 @@ export type AffiliateProduct = {
     affiliateLink: string;
     adminId: string;
 };
-

@@ -3,10 +3,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useUser, useAuth, useFirestore, setDocumentNonBlocking, requestPermission, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useAuth, useFirestore, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { updateProfile } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
-import { geohashForLocation } from 'geofirestore-px';
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -82,10 +81,10 @@ export default function SettingsPage() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          const newLocation = new GeoPoint(latitude, longitude);
           const userRef = doc(firestore, "users", user.uid);
           updateDocumentNonBlocking(userRef, {
-            location: new GeoPoint(latitude, longitude),
-            g: geohashForLocation([latitude, longitude])
+            coordinates: newLocation,
           });
           toast({
             title: "Location Updated",
