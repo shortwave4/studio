@@ -18,12 +18,13 @@ service cloud.firestore {
 
     // Rules for private chats
     match /chats/{chatId} {
-      // Allow read/list access to the messages subcollection if the user is part of the chat
-      allow list: if request.auth != null && request.auth.uid in chatId.split('_');
+      // A user can get info about the chat if they are a member.
+      // Note: This does not grant access to the subcollection.
+      allow get: if request.auth != null && request.auth.uid in chatId.split('_');
 
       // Rules for individual messages within a private chat
       match /messages/{messageId} {
-        // Only the two users involved in the chat can read or write messages.
+        // Only the two users involved in the chat can read (get, list) or write messages.
         allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
       }
     }
