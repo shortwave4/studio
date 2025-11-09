@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
@@ -31,7 +32,7 @@ export default function AdminPage() {
     }
     const adminRef = doc(firestore, 'roles_admin', user.uid);
     // We can use an empty object because we only check for the document's existence
-    setDocumentNonBlocking(adminRef, {}, { merge: true });
+    setDocumentNonBlocking(adminRef, {});
 
     toast({
       title: 'Success!',
