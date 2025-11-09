@@ -3,9 +3,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useUser, useAuth, useFirestore, setDocumentNonBlocking, requestPermission } from "@/firebase";
+import { useUser, useAuth, useFirestore, setDocumentNonBlocking, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { updateProfile } from "firebase/auth";
-import { doc } from "firebase/firestore";
+import { doc, GeoPoint } from "firebase/firestore";
+import { geohashForLocation } from 'geofirestore-px';
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { BellRing } from "lucide-react";
+import { BellRing, MapPin } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -25,6 +26,7 @@ export default function SettingsPage() {
   const [bio, setBio] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -55,7 +57,7 @@ export default function SettingsPage() {
 
       // Update bio in Firestore (non-blocking)
       const userRef = doc(firestore, "users", user.uid);
-      setDocumentNonBlocking(userRef, { bio: bio }, { merge: true });
+      updateDocumentNonBlocking(userRef, { name: name, bio: bio });
 
       toast({
         title: "Success!",
@@ -72,6 +74,45 @@ export default function SettingsPage() {
         setIsSaving(false);
     }
   };
+
+  const handleUpdateLocation = () => {
+    if (!user) return;
+    setIsUpdatingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const userRef = doc(firestore, "users", user.uid);
+          updateDocumentNonBlocking(userRef, {
+            location: new GeoPoint(latitude, longitude),
+            g: geohashForLocation([latitude, longitude])
+          });
+          toast({
+            title: "Location Updated",
+            description: "Your location has been successfully updated.",
+          });
+          setIsUpdatingLocation(false);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          toast({
+            variant: "destructive",
+            title: "Location Error",
+            description: "Could not retrieve your location. Please check your browser settings.",
+          });
+          setIsUpdatingLocation(false);
+        }
+      );
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Geolocation Not Supported",
+        description: "Your browser does not support geolocation.",
+      });
+      setIsUpdatingLocation(false);
+    }
+  };
+
 
   const handlePushToggle = async (checked: boolean) => {
     if (!user) return;
@@ -119,7 +160,7 @@ export default function SettingsPage() {
               This is how others will see you on the site.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -144,6 +185,18 @@ export default function SettingsPage() {
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
               />
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                <Label>Location</Label>
+                <p className="text-sm text-muted-foreground">
+                  Update your location to get better suggestions.
+                </p>
+              </div>
+              <Button onClick={handleUpdateLocation} variant="outline" disabled={isUpdatingLocation}>
+                <MapPin className="mr-2 h-4 w-4" />
+                {isUpdatingLocation ? "Updating..." : "Update Location"}
+              </Button>
             </div>
           </CardContent>
         </Card>

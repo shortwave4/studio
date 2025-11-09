@@ -3,8 +3,9 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useUser, useFirestore } from '@/firebase';
+import { collection, query, where, getDocs, limit, Query } from 'firebase/firestore';
+import { Geofirestore, geohashQueryBounds } from 'geofirestore';
 import type { UserProfile } from '@/types';
 import {
   Card,
@@ -15,7 +16,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MessageSquarePlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
 
 export default function DiscoverUsers() {
@@ -26,33 +26,31 @@ export default function DiscoverUsers() {
   const [suggestedUsers, setSuggestedUsers] = React.useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  const usersCollection = collection(firestore, 'users');
-  const { data: allUsers, isLoading: usersLoading } = useCollection<UserProfile>(usersCollection);
-
   React.useEffect(() => {
-    if (usersLoading) return;
-
-    const fetchSuggestions = async (latitude?: number, longitude?: number) => {
+    const fetchNearbyUsers = async (latitude: number, longitude: number) => {
       setIsLoading(true);
-      if (!allUsers) {
-         setIsLoading(false);
-         return;
-      }
       try {
-        // Use a default location if geolocation is not available or denied
-        const suggestions = await suggestUsersByLocation({
-          latitude: latitude || 37.7749, // Default to San Francisco
-          longitude: longitude || -122.4194,
-          users: allUsers,
+        const geoFirestore = new Geofirestore(collection(firestore, 'users'));
+        const radiusInM = 50 * 1000; // 50km
+        
+        const query = geoFirestore.near({
+          center: { latitude, longitude },
+          radius: radiusInM / 1000 // geofirestore uses km
         });
-        // Filter out the current user from the suggestions
-        const filteredSuggestions = suggestions.filter(u => u.id !== user?.uid);
-        setSuggestedUsers(filteredSuggestions.slice(0, 8)); // Limit to 8 for demo
-      } catch (aiError) {
-        console.error("AI suggestion failed:", aiError);
+
+        const snapshot = await query.limit(10).get();
+
+        const users: UserProfile[] = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as UserProfile))
+          .filter(u => u.id !== user?.uid); // Filter out the current user
+
+        setSuggestedUsers(users);
+
+      } catch (error) {
+        console.error("Geofirestore query failed:", error);
         toast({
           variant: "destructive",
-          title: "AI Suggestion Failed",
+          title: "Suggestion Failed",
           description: "Could not fetch location-based suggestions.",
         });
         setSuggestedUsers([]);
@@ -61,10 +59,33 @@ export default function DiscoverUsers() {
       }
     };
 
+    const fetchWithoutLocation = async () => {
+        setIsLoading(true);
+        try {
+            const usersRef = collection(firestore, 'users');
+            const q = query(usersRef, limit(8));
+            const querySnapshot = await getDocs(q);
+            const users = querySnapshot.docs
+                .map(doc => ({id: doc.id, ...doc.data()} as UserProfile))
+                .filter(u => u.id !== user?.uid);
+            setSuggestedUsers(users);
+        } catch (error) {
+            console.error("Fetching users failed:", error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not fetch users.",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          fetchSuggestions(position.coords.latitude, position.coords.longitude);
+          fetchNearbyUsers(position.coords.latitude, position.coords.longitude);
         },
         (error: GeolocationPositionError) => {
           if (error.code === error.PERMISSION_DENIED) {
@@ -81,7 +102,7 @@ export default function DiscoverUsers() {
               description: 'Could not retrieve location. Showing default suggestions.',
             });
           }
-          fetchSuggestions(); // Fetch with default location
+          fetchWithoutLocation();
         }
       );
     } else {
@@ -89,16 +110,16 @@ export default function DiscoverUsers() {
         title: "Geolocation not supported",
         description: "Showing default user suggestions.",
       });
-      fetchSuggestions(); // Fetch with default location
+      fetchWithoutLocation();
     }
-  }, [user?.uid, allUsers, usersLoading]);
+  }, [user?.uid, firestore]);
 
 
   const handleStartChat = () => {
     router.push('/chat');
   };
 
-  if (isLoading || usersLoading) {
+  if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
         {Array.from({ length: 8 }).map((_, i) => (

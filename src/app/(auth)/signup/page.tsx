@@ -6,7 +6,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc } from "firebase/firestore";
+import { doc, GeoPoint } from "firebase/firestore";
+import { Geofirestore, geohashForLocation, geohashQueryBounds } from 'geofirestore';
+
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase";
 import { Flame } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -38,6 +41,7 @@ export default function SignupPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,29 +52,59 @@ export default function SignupPage() {
     },
   });
 
+  const saveProfileWithLocation = (user: any, name: string, email: string) => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const userProfile = {
+            id: user.uid,
+            name,
+            email,
+            location: new GeoPoint(latitude, longitude),
+            g: geohashForLocation([latitude, longitude])
+          };
+          const userRef = doc(firestore, "users", user.uid);
+          setDocumentNonBlocking(userRef, userProfile, { merge: true });
+        },
+        () => {
+          // Handle error or permission denied, save without location
+          saveProfileWithoutLocation(user, name, email);
+        }
+      );
+    } else {
+      // Geolocation not supported
+      saveProfileWithoutLocation(user, name, email);
+    }
+  }
+
+  const saveProfileWithoutLocation = (user: any, name: string, email: string) => {
+      const userProfile = {
+        id: user.uid,
+        name,
+        email,
+        location: null,
+        g: null
+      };
+      const userRef = doc(firestore, "users", user.uid);
+      setDocumentNonBlocking(userRef, userProfile, { merge: true });
+  }
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    // We are not using the non-blocking version here because we need the user object
-    // to update the profile and create the firestore document.
     try {
       const userCredential: UserCredential | undefined = await createUserWithEmailAndPassword(auth, values.email, values.password);
       if (userCredential?.user) {
         await updateProfile(userCredential.user, { displayName: values.name });
-
-        // Save user profile to Firestore
-        const userRef = doc(firestore, "users", userCredential.user.uid);
-        const userProfile = {
-          id: userCredential.user.uid,
-          name: values.name,
-          email: values.email,
-        };
-        // Use non-blocking write to firestore
-        setDocumentNonBlocking(userRef, userProfile, { merge: true });
-
+        saveProfileWithLocation(userCredential.user, values.name, values.email);
         router.push('/');
       }
     } catch (error) {
       console.error("Signup failed:", error);
-      // You might want to show an error to the user here
+      toast({
+          variant: "destructive",
+          title: "Signup Failed",
+          description: "Could not create your account. Please try again.",
+      });
     }
   }
 

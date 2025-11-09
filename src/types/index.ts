@@ -1,15 +1,14 @@
 
+import type { GeoPoint } from 'firebase/firestore';
 
 export type UserProfile = {
     id: string; 
-    userId: string;
+    userId?: string;
     name: string;
     email: string;
     bio?: string;
-    location?: {
-        latitude: number;
-        longitude: number;
-    } | null;
+    location?: GeoPoint | null;
+    g?: string | null; // geohash for location
 };
 
 export type AffiliateProduct = {
