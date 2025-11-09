@@ -67,7 +67,7 @@ export default function ChatPage() {
           latitude: 37.7749,
           longitude: -122.4194,
         });
-        const filteredSuggestions = suggestions.filter(u => u.id !== user?.uid);
+        const filteredSuggestions = suggestions.filter(u => u.userId !== user?.uid);
         setContacts(filteredSuggestions);
       } catch (error) {
         console.error("Failed to fetch users for chat:", error);
@@ -236,7 +236,7 @@ export default function ChatPage() {
         {usersLoading ? (
           <div className="p-4 space-y-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4">
+              <div key={`skeleton-${i}`} className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-full bg-muted-foreground/20 animate-pulse" />
                 <div className="flex-grow space-y-2">
                   <div className="h-4 w-3/4 rounded bg-muted-foreground/20 animate-pulse" />
