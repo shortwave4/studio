@@ -18,11 +18,14 @@ service cloud.firestore {
 
       // Rules for status_updates sub-collection
       match /status_updates/{statusId} {
-        // Allow any authenticated user to read (get, list) status updates.
-        allow read: if request.auth != null;
+        // Allow any authenticated user to get a single status update.
+        allow get: if request.auth != null;
         // A user can only create, update, or delete their own status updates.
         allow write: if request.auth.uid == userId;
       }
+      
+      // Allow any authenticated user to list status updates for any user.
+      allow list: if request.auth != null;
     }
 
     // Rules for private chats
