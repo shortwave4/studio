@@ -6,10 +6,10 @@ import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { PlusCircle, X, Loader2 } from "lucide-react";
+import { PlusCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useCollection } from "@/firebase";
-import { collection, query, where, Timestamp } from "firebase/firestore";
+import { collection, query, where, Timestamp, getDocs } from "firebase/firestore";
 
 type StatusStory = {
   id: string;
@@ -56,6 +56,7 @@ export default function StatusPage() {
     const fetchStatusesForUsers = async () => {
       setStatusesLoading(true);
       const userStatusPromises = users.map(async (u) => {
+        if (!u.id) return null;
         const statusUpdatesRef = collection(firestore, 'users', u.id, 'status_updates');
         const q = query(statusUpdatesRef, where('timestamp', '>=', twentyFourHoursAgo));
         const statusSnap = await getDocs(q);
@@ -75,7 +76,7 @@ export default function StatusPage() {
         return {
           id: u.id,
           name: u.name,
-          avatarUrl: u.profilePictureUrl || `https://picsum.photos/seed/${u.id}/200`,
+          avatarUrl: `https://picsum.photos/seed/${u.id}/200`,
           stories,
           hasNew: true, // You could add logic to determine if they are "new"
         };
@@ -274,4 +275,3 @@ export default function StatusPage() {
     </div>
   );
 }
-

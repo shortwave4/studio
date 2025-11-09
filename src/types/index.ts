@@ -9,7 +9,7 @@ export type UserProfile = {
     location?: {
         latitude: number;
         longitude: number;
-    }
+    } | null;
 };
 
 export type AffiliateProduct = {
