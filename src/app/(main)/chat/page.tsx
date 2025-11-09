@@ -7,6 +7,11 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+import {
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -19,6 +24,7 @@ import {
   useUser,
   useFirestore,
   addDocumentNonBlocking,
+  useStorage
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -27,7 +33,9 @@ import {
   Mic,
   SendHorizonal,
   ArrowLeft,
+  Image as ImageIcon
 } from 'lucide-react';
+import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile } from '@/types';
 import type { ChatContact, Message } from '@/types/chat';
@@ -35,6 +43,7 @@ import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, WithId } from '@/firebase/firestore/use-collection';
 import { collection } from 'firebase/firestore';
+import { useMemoFirebase } from '@/firebase/provider';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -43,53 +52,77 @@ function getChatId(uid1: string, uid2: string) {
 export default function ChatPage() {
   const isMobile = useIsMobile();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { user } = useUser();
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
-  const [allMessages, setAllMessages] = useState<Message[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const usersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'users');
-  }, [firestore]);
-  const { data: usersData, isLoading: isUsersLoading } = useCollection<UserProfile>(usersCollection);
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setUsersLoading(true);
+      try {
+        const suggestions = await suggestUsersByLocation({
+          latitude: 37.7749,
+          longitude: -122.4194,
+        });
+        const filteredUsers = suggestions.filter((u) => u.userId !== user?.uid);
+        setContacts(filteredUsers as UserProfile[]);
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not load user suggestions for chat.",
+        });
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+    if (user?.uid) {
+      fetchUsers();
+    }
+  }, [user?.uid, toast]);
 
   const chatId = useMemo(() => {
     if (!user || !selectedChat) return null;
     return getChatId(user.uid, selectedChat.id);
   }, [user, selectedChat]);
-  
+
   const messagesCollection = useMemoFirebase(() => {
     if (!firestore || !chatId) return null;
     return collection(firestore, 'chats', chatId, 'messages');
   }, [firestore, chatId]);
 
-  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesCollection);
+  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesCollection, {
+    orderBy: ['timestamp', 'asc']
+  });
 
-  useEffect(() => {
-    if (!isUsersLoading && usersData) {
-      const filteredUsers = usersData.filter(u => u.id !== user?.uid);
-      setContacts(filteredUsers);
-      setUsersLoading(false);
-    }
-  }, [isUsersLoading, usersData, user?.uid]);
+  const messages: Message[] = useMemo(() => {
+    if (!messagesData) return [];
+    return messagesData.map(msg => ({
+      ...msg,
+      own: msg.senderId === user?.uid,
+    }));
+  }, [messagesData, user?.uid]);
 
   const getLastMessage = (contactId: string): { text: string; time: string } => {
-    const contactChatId = user ? getChatId(user.uid, contactId) : '';
-    const relevantMessages = (messagesData || []).filter(m => getChatId(m.senderId, user?.uid || '') === contactChatId || getChatId(m.senderId, contactId) === contactChatId);
-    
-    const lastMsg = relevantMessages
-      .sort((a, b) => ((b.timestamp as Timestamp)?.toDate()?.getTime() || 0) - ((a.timestamp as Timestamp)?.toDate()?.getTime() || 0))[0];
-
+    // This is a mock implementation since we don't have a direct query for the last message
+    // In a real app, you might store the last message on the contact/chat document itself.
+    const lastMsg = messagesData?.slice().reverse().find(m => 
+        (m.senderId === user?.uid && getChatId(m.senderId, contactId) === chatId) ||
+        (m.senderId === contactId && getChatId(m.senderId, user?.uid || '') === chatId)
+    );
+  
     if (lastMsg) {
       return {
-        text: lastMsg.text,
+        text: lastMsg.mediaUrl ? 'Photo' : lastMsg.text,
         time: getTimeString(lastMsg.timestamp)
       };
     }
@@ -97,44 +130,13 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (!messagesLoading && messagesData) {
-        const processedMessages = messagesData.map(msg => ({
-            ...msg,
-            own: msg.senderId === user?.uid,
-            status: 'sent',
-        }) as Message);
-        setAllMessages(processedMessages);
-    }
-  }, [messagesData, messagesLoading, user?.uid]);
-
-
-  useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('div:first-child');
-        if (scrollContainer) {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        }
-    }
-  }, [allMessages, optimisticMessages]);
-
-
-  const messages: Message[] = useMemo(() => {
-    if (!user) return [];
-    const combined = [...allMessages];
-  
-    const relevantOptimistic = optimisticMessages.filter(optMsg =>
-      selectedChat && getChatId(optMsg.senderId, selectedChat.id) === chatId
-    );
-  
-    relevantOptimistic.forEach(optMsg => {
-      if (!combined.some(m => m.id === optMsg.id)) {
-        combined.push(optMsg);
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
-    });
-  
-    return combined.sort((a, b) => ((a.timestamp as Date)?.getTime() || 0) - ((b.timestamp as Date)?.getTime() || 0));
-  }, [allMessages, optimisticMessages, user, selectedChat, chatId]);
-
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (!isMobile && contacts && contacts.length > 0 && !selectedChat) {
@@ -145,17 +147,7 @@ export default function ChatPage() {
     }
   }, [contacts, isMobile, selectedChat, user]);
 
-   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('div:first-child');
-        if (scrollContainer) {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        }
-    }
-  }, [messages]);
-
   const handleSelectChat = (contact: UserProfile) => {
-    setOptimisticMessages([]); // Clear optimistic messages for previous chat
     setSelectedChat({
       ...contact,
       lastMessage: 'Click to start chatting!',
@@ -165,33 +157,68 @@ export default function ChatPage() {
   const handleSendMessage = (e: FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
-    
-    const optimisticId = `optimistic-${Date.now()}`;
-    const newOptimisticMessage: Message = {
-      id: optimisticId,
-      text: newMessage,
-      senderId: user.uid,
-      timestamp: new Date(),
-      own: true,
-      status: 'sending',
-    };
-
-    setOptimisticMessages(prev => [...prev, newOptimisticMessage]);
 
     addDocumentNonBlocking(messagesCollection, {
       text: newMessage,
       senderId: user.uid,
       timestamp: serverTimestamp(),
-    }).then(() => {
-        // The message is now in Firestore and the useCollection hook will update the state.
-        // We can remove the optimistic message.
-        setTimeout(() => {
-            setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
-        }, 1000); // Give it a second for effect
+      messageType: 'text',
+      mediaUrl: null,
     });
 
     setNewMessage('');
   };
+
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0 || !storage || !user || !messagesCollection) {
+      return;
+    }
+
+    const file = event.target.files[0];
+    if (!file.type.startsWith('image/')) {
+        toast({
+            variant: "destructive",
+            title: "Invalid File Type",
+            description: "Please select an image file."
+        });
+        return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const storageRef = ref(storage, `chat_media/${chatId}/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      await addDocumentNonBlocking(messagesCollection, {
+        text: '',
+        senderId: user.uid,
+        timestamp: serverTimestamp(),
+        messageType: 'image',
+        mediaUrl: downloadURL,
+      });
+
+    } catch (error) {
+      console.error("File upload failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Upload Failed",
+        description: "Could not upload your file. Please try again.",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
 
   const getTimeString = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return '';
@@ -289,13 +316,12 @@ export default function ChatPage() {
       {/* Messages */}
       <ScrollArea className="flex-grow p-4 bg-background/30" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
-          {messages.map((msg) => (
+          {messages.map((msg, index) => (
             <div
-              key={msg.id}
+              key={msg.id || index}
               className={cn(
                 'flex max-w-[75%] gap-2',
                 msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto',
-                msg.status === 'sending' && 'opacity-50'
               )}
             >
               <Avatar className="w-8 h-8">
@@ -317,7 +343,13 @@ export default function ChatPage() {
                       : 'bg-muted rounded-bl-none'
                   )}
                 >
-                  <p>{msg.text}</p>
+                  {msg.messageType === 'image' && msg.mediaUrl ? (
+                    <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
+                      <Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/>
+                    </a>
+                  ) : (
+                    <p>{msg.text}</p>
+                  )}
                 </div>
                 <p
                   className={cn(
@@ -325,11 +357,27 @@ export default function ChatPage() {
                     msg.own ? 'text-right' : 'text-left'
                   )}
                 >
-                   {msg.status === 'sending' ? 'Sending...' : getTimeString(msg.timestamp)}
+                   {getTimeString(msg.timestamp)}
                 </p>
               </div>
             </div>
           ))}
+           {isUploading && (
+             <div className="flex max-w-[75%] gap-2 ml-auto flex-row-reverse opacity-50">
+               <Avatar className="w-8 h-8">
+                 <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/200`} />
+                 <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+               </Avatar>
+               <div className="flex flex-col">
+                 <div className="rounded-lg p-3 text-sm bg-primary text-primary-foreground rounded-br-none">
+                   <div className="flex items-center gap-2">
+                     <ImageIcon className="w-4 h-4 animate-pulse" />
+                     <p>Uploading image...</p>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           )}
         </div>
       </ScrollArea>
 
@@ -341,10 +389,11 @@ export default function ChatPage() {
             className="pr-28"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            disabled={!selectedChat}
+            disabled={!selectedChat || isUploading}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            <Button variant="ghost" size="icon" type="button" disabled>
+             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+            <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading}>
               <Paperclip className="w-5 h-5" />
             </Button>
             <Button variant="ghost" size="icon" type="button" disabled>
@@ -354,7 +403,7 @@ export default function ChatPage() {
               size="icon"
               className="bg-accent hover:bg-accent/90"
               type="submit"
-              disabled={!selectedChat || !newMessage.trim()}
+              disabled={!selectedChat || !newMessage.trim() || isUploading}
             >
               <SendHorizonal className="w-5 h-5" />
             </Button>
@@ -397,5 +446,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    

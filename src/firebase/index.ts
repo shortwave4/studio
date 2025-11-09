@@ -5,6 +5,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore'
 import { getMessaging, isSupported } from 'firebase/messaging';
+import { getStorage } from 'firebase/storage';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -36,6 +37,7 @@ export function initializeFirebase() {
 export function getSdks(firebaseApp: FirebaseApp) {
     const firestore = getFirestore(firebaseApp);
     const auth = getAuth(firebaseApp);
+    const storage = getStorage(firebaseApp);
     
     // Conditionally initialize messaging only on the client and if supported
     let messaging = null;
@@ -52,6 +54,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
         auth,
         firestore,
         messaging,
+        storage,
     };
 }
 
