@@ -42,13 +42,6 @@ function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
 }
 
-const mockContacts: UserProfile[] = [
-    { userId: 'user1', name: 'Alice', bio: 'Loves hiking and photography.' },
-    { userId: 'user2', name: 'Bob', bio: 'Interested in coding and gaming.' },
-    { userId: 'user3', name: 'Charlie', bio: 'Foodie and world traveler.' },
-    { userId: 'user4', name: 'Diana', bio: 'Musician and artist.' },
-];
-
 const mockMessages: Omit<Message, 'own' | 'status'>[] = [
   { id: 'm1', senderId: 'user1', text: 'Hey, how is it going?', timestamp: new Date(Date.now() - 1000 * 60 * 5) },
   { id: 'm2', senderId: 'currentUser', text: 'Doing great! How about you?', timestamp: new Date(Date.now() - 1000 * 60 * 4) },
@@ -67,8 +60,12 @@ export default function ChatPage() {
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
 
   // Using mock contacts to avoid permission errors
-  const contacts: UserProfile[] = mockContacts;
-  const usersLoading = false;
+  const usersCollectionRef = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'users') : null),
+    [firestore]
+  );
+  const { data: contacts, isLoading: usersLoading } =
+    useCollection<UserProfile>(usersCollectionRef);
 
   const messagesData = useMemo(() => {
     if (!user || !selectedChat) return [];
@@ -131,13 +128,12 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!isMobile && contacts && contacts.length > 0 && !selectedChat) {
-      setSelectedChat({
-        id: contacts[0].userId,
-        ...contacts[0],
-        lastMessage: 'Select a chat to start messaging',
-      });
+      const firstContact = contacts.find(c => c.id !== user?.uid);
+      if (firstContact) {
+        handleSelectChat(firstContact);
+      }
     }
-  }, [contacts, isMobile, selectedChat]);
+  }, [contacts, isMobile, selectedChat, user]);
 
    useEffect(() => {
     if (scrollAreaRef.current) {
@@ -150,7 +146,6 @@ export default function ChatPage() {
 
   const handleSelectChat = (contact: UserProfile) => {
     setSelectedChat({
-      id: contact.userId,
       ...contact,
       lastMessage: '...',
     });
@@ -160,8 +155,9 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user) return;
 
-    // const chatId = getChatId(user.uid, selectedChat.id);
-    // const messagesCol = collection(firestore, 'chats', chatId, 'messages');
+    // This part is commented out to prevent permission errors
+    const chatId = getChatId(user.uid, selectedChat.id);
+    const messagesCol = collection(firestore, 'chats', chatId, 'messages');
     
     // Optimistic update
     const optimisticId = `optimistic-${Date.now()}`;
@@ -176,12 +172,11 @@ export default function ChatPage() {
 
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
 
-    // This part is commented out to prevent permission errors
-    // addDocumentNonBlocking(messagesCol, {
-    //   text: newMessage,
-    //   senderId: user.uid,
-    //   timestamp: serverTimestamp(),
-    // }).then(docRef => {
+    addDocumentNonBlocking(messagesCol, {
+      text: newMessage,
+      senderId: user.uid,
+      timestamp: serverTimestamp(),
+    }).then(() => {
         // This logic will kick in if we switch back to live data
         // For now, we manually simulate the sent status
         setTimeout(() => {
@@ -189,7 +184,7 @@ export default function ChatPage() {
                 msg.id === optimisticId ? { ...msg, status: 'sent' } : msg
             ));
         }, 1000);
-    // });
+    });
 
     setNewMessage('');
   };
@@ -225,25 +220,25 @@ export default function ChatPage() {
             ))}
           </div>
         ) : (
-          contacts?.map((contact) => (
+          contacts?.filter(c => c.id !== user?.uid).map((contact) => (
             <div
-              key={contact.userId}
+              key={contact.id}
               className={cn(
                 'flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
-                selectedChat?.id === contact.userId && 'bg-accent/80'
+                selectedChat?.id === contact.id && 'bg-accent/80'
               )}
               onClick={() => handleSelectChat(contact)}
             >
               <Avatar>
                 <AvatarImage
-                  src={`https://picsum.photos/seed/${contact.userId}/200`}
+                  src={`https://picsum.photos/seed/${contact.id}/200`}
                 />
                 <AvatarFallback>{contact.name?.charAt(0)}</AvatarFallback>
               </Avatar>
               <div className="flex-grow overflow-hidden">
                 <p className="font-semibold truncate">{contact.name}</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  {/* Real last message would go here */}
+                  {mockMessages.slice(-1)[0]?.text}
                 </p>
               </div>
             </div>
