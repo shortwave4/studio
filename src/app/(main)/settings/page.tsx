@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useUser, useAuth, useFirestore, useStorage, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { updateProfile } from "firebase/auth";
-import { doc, GeoPoint } from "firebase/firestore";
+import { doc, GeoPoint, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -178,7 +178,7 @@ export default function SettingsPage() {
         await updateProfile(auth.currentUser, { photoURL: downloadURL });
 
         const userDocRef = doc(firestore, 'users', user.uid);
-        updateDocumentNonBlocking(userDocRef, { profilePictureUrl: downloadURL });
+        await updateDoc(userDocRef, { profilePictureUrl: downloadURL });
 
         toast({
             title: "Avatar Updated!",
@@ -354,3 +354,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
