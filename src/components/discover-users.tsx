@@ -91,7 +91,7 @@ export default function DiscoverUsers() {
       });
       fetchSuggestions(); // Fetch with default location
     }
-  }, [toast, user?.uid, allUsers, usersLoading]);
+  }, [user?.uid, allUsers, usersLoading]);
 
 
   const handleStartChat = () => {
