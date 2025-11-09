@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, FormEvent, useRef } from 'react';
 import {
   serverTimestamp,
   Timestamp,
+  collection,
 } from 'firebase/firestore';
 import {
   ref,
@@ -24,7 +25,8 @@ import {
   useUser,
   useFirestore,
   addDocumentNonBlocking,
-  useStorage
+  useStorage,
+  useCollection,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -43,8 +45,7 @@ import type { UserProfile } from '@/types';
 import type { ChatContact, Message } from '@/types/chat';
 import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, WithId } from '@/firebase/firestore/use-collection';
-import { collection } from 'firebase/firestore';
+import { WithId } from '@/firebase/firestore/use-collection';
 import { useMemoFirebase } from '@/firebase/provider';
 
 function getChatId(uid1: string, uid2: string) {
@@ -69,15 +70,20 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
 
+  const usersCollection = collection(firestore, 'users');
+  const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
+
   useEffect(() => {
     const fetchUsers = async () => {
+      if (allUsersLoading || !allUsers) return;
       setUsersLoading(true);
       try {
         const suggestions = await suggestUsersByLocation({
           latitude: 37.7749,
           longitude: -122.4194,
+          users: allUsers,
         });
-        const filteredUsers = suggestions.filter((u) => u.userId !== user?.uid);
+        const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
         setContacts(filteredUsers as UserProfile[]);
       } catch (error) {
         console.error("Failed to fetch users:", error);
@@ -93,7 +99,7 @@ export default function ChatPage() {
     if (user?.uid) {
       fetchUsers();
     }
-  }, [user?.uid, toast]);
+  }, [user?.uid, toast, allUsers, allUsersLoading]);
 
   const chatId = useMemo(() => {
     if (!user || !selectedChat) return null;

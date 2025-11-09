@@ -10,8 +10,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import {initializeApp, getApps, App} from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import type { UserProfile } from '@/types';
 
 // Haversine distance function
@@ -34,16 +32,6 @@ function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
 
-// Helper to initialize Firebase Admin SDK on the server
-let adminApp: App;
-if (!getApps().length) {
-  adminApp = initializeApp();
-} else {
-  adminApp = getApps()[0];
-}
-
-const firestoreDb = getFirestore(adminApp);
-
 const SuggestUsersByLocationInputSchema = z.object({
   latitude: z
     .number()
@@ -51,6 +39,7 @@ const SuggestUsersByLocationInputSchema = z.object({
   longitude: z
     .number()
     .describe('The longitude of the user requesting suggestions.'),
+  users: z.array(z.any()).describe('A list of user profiles from the database.'),
 });
 export type SuggestUsersByLocationInput = z.infer<
   typeof SuggestUsersByLocationInputSchema
@@ -91,12 +80,7 @@ const suggestUsersByLocationFlow = ai.defineFlow(
     outputSchema: SuggestUsersByLocationOutputSchema,
   },
   async (input) => {
-    // Fetch users from Firestore using the Admin SDK
-    const usersCollection = firestoreDb.collection('users');
-    const usersSnapshot = await usersCollection.get();
-    const users: UserProfile[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-
-    const usersWithLocation = users.filter(user => user.location);
+    const usersWithLocation = input.users.filter(user => user.location) as UserProfile[];
     
     // Sort users by proximity to the input location
     usersWithLocation.sort((a, b) => {
@@ -119,3 +103,4 @@ const suggestUsersByLocationFlow = ai.defineFlow(
     return usersWithLocation;
   }
 );
+
