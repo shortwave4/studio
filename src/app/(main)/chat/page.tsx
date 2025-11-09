@@ -27,6 +27,7 @@ import {
   addDocumentNonBlocking,
   useStorage,
   useCollection,
+  useMemoFirebase,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -46,7 +47,6 @@ import type { ChatContact, Message } from '@/types/chat';
 import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
-import { useMemoFirebase } from '@/firebase/provider';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -70,7 +70,7 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
 
-  const usersCollection = collection(firestore, 'users');
+  const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
   useEffect(() => {

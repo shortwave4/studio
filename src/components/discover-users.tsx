@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore, useCollection } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import {
@@ -26,20 +26,21 @@ export default function DiscoverUsers() {
   const [suggestedUsers, setSuggestedUsers] = React.useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  const usersCollection = useCollection<UserProfile>(collection(firestore, 'users'));
+  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: usersCollection, isLoading: usersCollectionLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   React.useEffect(() => {
     const fetchUsers = async (latitude?: number, longitude?: number) => {
       setIsLoading(true);
-      if (usersCollection.isLoading) return;
+      if (usersCollectionLoading) return;
 
       try {
-        if (!usersCollection.data) {
+        if (!usersCollection) {
           setSuggestedUsers([]);
           return;
         }
 
-        const validUsers = usersCollection.data.filter(u => u.id && u.name && u.email);
+        const validUsers = usersCollection.filter(u => u.id && u.name && u.email);
 
         if (latitude && longitude) {
             const plainUsers = validUsers.map(u => ({
@@ -99,14 +100,14 @@ export default function DiscoverUsers() {
       });
       fetchUsers();
     }
-  }, [user?.uid, firestore, toast, user, usersCollection.data, usersCollection.isLoading]);
+  }, [user?.uid, firestore, toast, user, usersCollection, usersCollectionLoading]);
 
 
   const handleStartChat = () => {
     router.push('/chat');
   };
 
-  if (isLoading || usersCollection.isLoading) {
+  if (isLoading || usersCollectionLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
         {Array.from({ length: 8 }).map((_, i) => (
