@@ -95,13 +95,21 @@ export default function SignupPage() {
         saveProfileWithLocation(userCredential.user, values.name, values.email);
         router.push('/');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Signup failed:", error);
-      toast({
-          variant: "destructive",
-          title: "Signup Failed",
-          description: "Could not create your account. Please try again.",
-      });
+      if (error.code === 'auth/email-already-in-use') {
+        toast({
+            variant: "destructive",
+            title: "Signup Failed",
+            description: "This email is already registered. Please login or use a different email.",
+        });
+      } else {
+        toast({
+            variant: "destructive",
+            title: "Signup Failed",
+            description: "Could not create your account. Please try again.",
+        });
+      }
     }
   }
 
