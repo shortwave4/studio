@@ -3,18 +3,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow any authenticated user to list all users. This is necessary for
-    // features like the discover page and adding new chat contacts.
-    match /users {
-      allow list: if request.auth != null;
-    }
-
     // Rules for user profiles
     match /users/{userId} {
       // Any authenticated user can view any other user's profile.
       allow get: if request.auth != null;
       // A user can only create, update, or delete their own profile data.
       allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow any authenticated user to list all users. This is necessary for
+    // features like the discover page and adding new chat contacts.
+    // NOTE: This rule is separate from the /users/{userId} rule.
+    match /users {
+      allow list: if request.auth != null;
     }
 
     // Rules for private chat messages
@@ -27,7 +28,8 @@ service cloud.firestore {
     // Rules for user status updates
     match /users/{userId}/status_updates/{statusId} {
       // Any authenticated user can read status updates.
-      allow read: if request.auth != null;
+      // We need get access for the collection as well as individual documents
+      allow get, list: if request.auth != null;
       // A user can only create, update, or delete their own status updates.
       allow write: if request.auth != null && request.auth.uid == userId;
     }
