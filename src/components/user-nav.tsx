@@ -1,3 +1,4 @@
+
 "use client";
 
 import { LogOut, Settings, User } from "lucide-react";
@@ -45,7 +46,7 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.photoURL ?? `https://picsum.photos/seed/${user.uid}/200`} alt={user.displayName ?? ""} />
+            <AvatarImage key={user.photoURL} src={user.photoURL ?? `https://picsum.photos/seed/${user.uid}/200`} alt={user.displayName ?? ""} />
             <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
           </Avatar>
         </Button>

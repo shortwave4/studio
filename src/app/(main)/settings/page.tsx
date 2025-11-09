@@ -3,9 +3,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useUser, useAuth, useFirestore, requestPermission, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useAuth, useFirestore, useStorage, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { updateProfile } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { BellRing, MapPin } from "lucide-react";
+import { BellRing, MapPin, Camera } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProfileImageCropper } from "@/components/profile-image-cropper";
 
 export default function SettingsPage() {
   const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
 
   const [name, setName] = useState("");
@@ -26,6 +30,12 @@ export default function SettingsPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // State to force re-render of avatar
+  const [avatarKey, setAvatarKey] = useState(Date.now());
+
 
   useEffect(() => {
     if (user) {
@@ -141,6 +151,54 @@ export default function SettingsPage() {
       // We don't show a toast here to avoid being too noisy.
     }
   };
+  
+    const getInitials = (name?: string | null) => {
+    if (!name) return "";
+    const nameParts = name.split(" ");
+    if (nameParts.length === 1 && nameParts[0].length > 1) {
+      return nameParts[0].substring(0, 2).toUpperCase();
+    }
+    return nameParts.map((part) => part[0]).join("").toUpperCase();
+  };
+  
+  const handleAvatarSave = async (imageBlob: Blob) => {
+    if (!user || !storage || !auth.currentUser) return;
+    
+    setIsUploading(true);
+    
+    try {
+        const filePath = `profile-images/${user.uid}.jpg`;
+        const storageRef = ref(storage, filePath);
+        
+        const snapshot = await uploadBytes(storageRef, imageBlob, {
+            contentType: 'image/jpeg'
+        });
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        await updateProfile(auth.currentUser, { photoURL: downloadURL });
+
+        const userDocRef = doc(firestore, 'users', user.uid);
+        updateDocumentNonBlocking(userDocRef, { profilePictureUrl: downloadURL });
+
+        toast({
+            title: "Avatar Updated!",
+            description: "Your new profile picture has been saved.",
+        });
+        
+        setAvatarKey(Date.now()); // Force re-render
+        setIsCropperOpen(false);
+
+    } catch (error) {
+        console.error("Error uploading avatar:", error);
+        toast({
+            variant: "destructive",
+            title: "Upload Failed",
+            description: "Could not update your profile picture. Please try again."
+        });
+    } finally {
+        setIsUploading(false);
+    }
+  };
 
 
   return (
@@ -160,13 +218,37 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+            <div className="flex items-center gap-6">
+                <div className="relative group">
+                    <Avatar className="h-24 w-24">
+                        <AvatarImage key={avatarKey} src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                        <AvatarFallback className="text-3xl">
+                            {getInitials(user?.displayName)}
+                        </AvatarFallback>
+                    </Avatar>
+                    <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="absolute inset-0 m-auto h-10 w-10 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setIsCropperOpen(true)}
+                    >
+                        <Camera className="h-5 w-5" />
+                    </Button>
+                </div>
+                 <ProfileImageCropper 
+                    open={isCropperOpen}
+                    onOpenChange={setIsCropperOpen}
+                    onSave={handleAvatarSave}
+                    isSaving={isUploading}
+                 />
+                <div className="flex-grow space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
