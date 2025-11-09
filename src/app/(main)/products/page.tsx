@@ -21,20 +21,20 @@ export default function ProductsPage() {
   const { data: products, isLoading: productsLoading } = useCollection<AffiliateProduct>(productsCollection);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>("All");
 
   const isLoading = isAdminLoading || productsLoading;
 
   const categories = useMemo(() => {
     if (!products) return [];
-    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean) as string[])];
     return ["All", ...uniqueCategories];
   }, [products]);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     return products.filter(product => {
-      const matchesCategory = selectedCategory === null || selectedCategory === "All" || product.category === selectedCategory;
+      const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesCategory && matchesSearch;
     });
@@ -72,7 +72,7 @@ export default function ProductsPage() {
             {categories.map(category => (
                 <Button 
                     key={category}
-                    variant={selectedCategory === category || (selectedCategory === null && category === "All") ? "default" : "outline"}
+                    variant={selectedCategory === category ? "default" : "outline"}
                     onClick={() => setSelectedCategory(category)}
                     className="whitespace-nowrap"
                 >
