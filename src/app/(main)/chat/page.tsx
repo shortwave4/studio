@@ -3,12 +3,8 @@
 
 import { useState, useMemo, useEffect, FormEvent, useRef } from 'react';
 import {
-  collection,
-  query,
-  where,
   serverTimestamp,
   Timestamp,
-  orderBy,
 } from 'firebase/firestore';
 import {
   Avatar,
@@ -23,8 +19,6 @@ import {
   useUser,
   useFirestore,
   addDocumentNonBlocking,
-  useCollection,
-  useMemoFirebase,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -37,6 +31,8 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile } from '@/types';
 import type { ChatContact, Message } from '@/types/chat';
+import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
+import { useToast } from '@/hooks/use-toast';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -53,19 +49,41 @@ export default function ChatPage() {
   const isMobile = useIsMobile();
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  const [contacts, setContacts] = useState<UserProfile[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
 
-  // Using mock contacts to avoid permission errors
-  const usersCollectionRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'users') : null),
-    [firestore]
-  );
-  const { data: contacts, isLoading: usersLoading } =
-    useCollection<UserProfile>(usersCollectionRef);
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setUsersLoading(true);
+      try {
+        // For chat, we can just get default suggestions
+        const suggestions = await suggestUsersByLocation({
+          latitude: 37.7749,
+          longitude: -122.4194,
+        });
+        const filteredSuggestions = suggestions.filter(u => u.id !== user?.uid);
+        setContacts(filteredSuggestions);
+      } catch (error) {
+        console.error("Failed to fetch users for chat:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not load users for chat.",
+        });
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+    if (user?.uid) {
+      fetchUsers();
+    }
+  }, [user?.uid, toast]);
 
   const messagesData = useMemo(() => {
     if (!user || !selectedChat) return [];
@@ -112,6 +130,7 @@ export default function ChatPage() {
     const relevantOptimisticMessages = optimisticMessages.filter(
       (optMsg) =>
         selectedChat &&
+        user && // ensure user is not null
         getChatId(optMsg.senderId, selectedChat.id) === getChatId(user.uid, selectedChat.id)
     );
   
@@ -122,7 +141,7 @@ export default function ChatPage() {
       }
     });
   
-    return combinedMessages;
+    return combinedMessages.sort((a, b) => (a.timestamp as Date).getTime() - (b.timestamp as Date).getTime());
   }, [messagesData, optimisticMessages, user, selectedChat]);
 
 
@@ -147,7 +166,7 @@ export default function ChatPage() {
   const handleSelectChat = (contact: UserProfile) => {
     setSelectedChat({
       ...contact,
-      lastMessage: mockMessages.slice(-1)[0]?.text || '...',
+      lastMessage: 'Click to start chatting!',
     });
   };
 
@@ -188,6 +207,7 @@ export default function ChatPage() {
     
     // Simulate sent status
      setTimeout(() => {
+            mockMessages.push({ id: optimisticId, senderId: 'currentUser', text: newMessage, timestamp: new Date() });
             setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
      }, 1000);
 
@@ -226,7 +246,7 @@ export default function ChatPage() {
             ))}
           </div>
         ) : (
-          contacts?.filter(c => c.id !== user?.uid).map((contact) => (
+          contacts?.map((contact) => (
             <div
               key={contact.id}
               className={cn(
@@ -244,7 +264,7 @@ export default function ChatPage() {
               <div className="flex-grow overflow-hidden">
                 <p className="font-semibold truncate">{contact.name}</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  {mockMessages.slice(-1)[0]?.text}
+                  Click to start chatting!
                 </p>
               </div>
             </div>
@@ -299,8 +319,8 @@ export default function ChatPage() {
                   src={`https://picsum.photos/seed/${msg.senderId}/200`}
                 />
                 <AvatarFallback>
-                  {msg.own
-                    ? user?.displayName?.charAt(0)
+                  {msg.own && user
+                    ? user.displayName?.charAt(0)
                     : selectedChat.name?.charAt(0)}
                 </AvatarFallback>
               </Avatar>

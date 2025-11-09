@@ -3,8 +3,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useUser } from '@/firebase';
 import type { UserProfile } from '@/types';
 import {
   Card,
@@ -13,89 +12,79 @@ import {
 } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MessageSquarePlus, Loader2 } from 'lucide-react';
+import { MessageSquarePlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
 
 export default function DiscoverUsers() {
   const router = useRouter();
-  const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [suggestedUsers, setSuggestedUsers] = React.useState<UserProfile[]>([]);
-  const [isSuggesting, setIsSuggesting] = React.useState(true);
-
-  const usersCollectionRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'users') : null),
-    [firestore]
-  );
-  const { data: users, isLoading: loading, error } = useCollection<UserProfile>(usersCollectionRef);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
+    const fetchSuggestions = async (latitude?: number, longitude?: number) => {
+      setIsLoading(true);
+      try {
+        // Use a default location if geolocation is not available or denied
+        const suggestions = await suggestUsersByLocation({
+          latitude: latitude || 37.7749, // Default to San Francisco
+          longitude: longitude || -122.4194,
+        });
+        // Filter out the current user from the suggestions
+        const filteredSuggestions = suggestions.filter(u => u.id !== user?.uid);
+        setSuggestedUsers(filteredSuggestions.slice(0, 8)); // Limit to 8 for demo
+      } catch (aiError) {
+        console.error("AI suggestion failed:", aiError);
+        toast({
+          variant: "destructive",
+          title: "AI Suggestion Failed",
+          description: "Could not fetch location-based suggestions.",
+        });
+        setSuggestedUsers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const suggestions = await suggestUsersByLocation({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            });
-            // Let's merge AI suggestions with real users to make it more realistic
-            const suggestedIds = suggestions.map(s => s.userId);
-            const realSuggestedUsers = users?.filter(u => suggestedIds.includes(u.id)) || [];
-            
-            // To make sure we always have some users, we'll combine them.
-            // In a real app, the AI would probably get users from the DB directly.
-            const combined = [...realSuggestedUsers, ...suggestions.filter(s => !realSuggestedUsers.find(r => r.id === s.userId))];
-            
-            setSuggestedUsers(combined.slice(0, 8)); // Limit to 8 for demo
-          } catch (aiError) {
-            console.error("AI suggestion failed:", aiError);
-            toast({
-              variant: "destructive",
-              title: "AI Suggestion Failed",
-              description: "Could not fetch location-based suggestions. Showing all users.",
-            });
-            setSuggestedUsers(users || []);
-          } finally {
-            setIsSuggesting(false);
-          }
+        (position) => {
+          fetchSuggestions(position.coords.latitude, position.coords.longitude);
         },
         (error: GeolocationPositionError) => {
           if (error.code === error.PERMISSION_DENIED) {
             toast({
               variant: 'destructive',
               title: 'Location Access Denied',
-              description: 'Showing all users as location access was denied.',
+              description: 'Showing default user suggestions.',
             });
           } else {
             console.error('Geolocation error:', error.message);
             toast({
               variant: 'destructive',
               title: 'Location Error',
-              description: 'Could not retrieve location. Showing all users.',
+              description: 'Could not retrieve location. Showing default suggestions.',
             });
           }
-          setSuggestedUsers(users || []);
-          setIsSuggesting(false);
+          fetchSuggestions(); // Fetch with default location
         }
       );
     } else {
-        toast({
-            title: "Geolocation not supported",
-            description: "Showing all users as geolocation is not supported by your browser.",
-        });
-        setSuggestedUsers(users || []);
-        setIsSuggesting(false);
+      toast({
+        title: "Geolocation not supported",
+        description: "Showing default user suggestions.",
+      });
+      fetchSuggestions(); // Fetch with default location
     }
-  }, [users, toast]);
+  }, [toast, user?.uid]);
 
 
   const handleStartChat = () => {
     router.push('/chat');
   };
-
-  const isLoading = loading || isSuggesting;
 
   if (isLoading) {
     return (
@@ -122,10 +111,6 @@ export default function DiscoverUsers() {
         ))}
       </div>
     );
-  }
-
-  if (error) {
-    return <p className="text-destructive text-center">Failed to load users. Please check your security rules.</p>;
   }
 
   return (
