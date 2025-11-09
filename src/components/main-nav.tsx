@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Settings,
   Flame,
+  Shield,
 } from "lucide-react";
 
 import {
@@ -27,6 +28,7 @@ export function MainNav() {
     { href: "/status", label: "Status", icon: ImageIcon },
     { href: "/products", label: "Products", icon: ShoppingBag },
     { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/admin", label: "Admin", icon: Shield },
   ];
 
   return (
