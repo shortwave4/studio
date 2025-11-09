@@ -35,7 +35,8 @@ service cloud.firestore {
       // Any authenticated user can read the product list.
       allow list, get: if request.auth != null;
       // Only users marked as admin can write (add, update, delete) products.
-      allow write: if request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      // Admin role is determined by email address in the application logic, not a Firestore document.
+      allow write: if request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
     }
     
     // Rules for chat groups
@@ -53,15 +54,6 @@ service cloud.firestore {
         // A user can read/write messages in a group if they are a member.
         // This is checked by getting the group document and verifying membership.
         allow read, write: if request.auth != null && get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
-    }
-
-    // Rules for admin roles
-    match /roles_admin/{userId} {
-      // Allow anyone to check if a user is an admin to fix permission errors.
-      allow get: if true;
-      allow list: if request.auth != null;
-      // Only a user can make themselves an admin.
-      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
