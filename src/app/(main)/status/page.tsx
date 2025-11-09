@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, query, where, Timestamp, getDocs } from "firebase/firestore";
 
 type StatusStory = {
@@ -39,7 +39,6 @@ export default function StatusPage() {
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: users, isLoading: usersLoading } = useCollection(usersCollectionRef);
 
-  // 2. For each user, fetch their status updates from the last 24 hours
   const [statuses, setStatuses] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(true);
 
@@ -57,27 +56,37 @@ export default function StatusPage() {
         if (!u.id) return null;
         const statusUpdatesRef = collection(firestore, 'users', u.id, 'status_updates');
         const q = query(statusUpdatesRef, where('timestamp', '>=', twentyFourHoursAgo));
-        const statusSnap = await getDocs(q);
         
-        if (statusSnap.empty) {
-          return null;
+        try {
+            const statusSnap = await getDocs(q);
+            
+            if (statusSnap.empty) {
+              return null;
+            }
+    
+            const stories: StatusStory[] = statusSnap.docs.map(doc => ({
+              id: doc.id,
+              mediaUrl: doc.data().mediaUrl,
+              text: doc.data().text,
+              timestamp: doc.data().timestamp,
+              duration: 5000, // 5 seconds per story
+            })).sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+    
+            return {
+              id: u.id,
+              name: u.name,
+              avatarUrl: `https://picsum.photos/seed/${u.id}/200`,
+              stories,
+              hasNew: true, // You could add logic to determine if they are "new"
+            };
+        } catch (serverError) {
+            const permissionError = new FirestorePermissionError({
+              path: statusUpdatesRef.path,
+              operation: 'list', 
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            return null; // Return null on error
         }
-
-        const stories: StatusStory[] = statusSnap.docs.map(doc => ({
-          id: doc.id,
-          mediaUrl: doc.data().mediaUrl,
-          text: doc.data().text,
-          timestamp: doc.data().timestamp,
-          duration: 5000, // 5 seconds per story
-        })).sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-
-        return {
-          id: u.id,
-          name: u.name,
-          avatarUrl: `https://picsum.photos/seed/${u.id}/200`,
-          stories,
-          hasNew: true, // You could add logic to determine if they are "new"
-        };
       });
 
       const results = (await Promise.all(userStatusPromises)).filter(Boolean) as StatusUser[];
@@ -95,9 +104,9 @@ export default function StatusPage() {
       setActiveStoryIndex(prev => prev + 1);
     } else {
       const currentUserIndex = statuses.findIndex(u => u.id === activeUser.id);
-      const nextUserIndex = (currentUserIndex + 1) % statuses.length;
-      if (statuses[nextUserIndex]) {
-        handleSelectUser(statuses[nextUserIndex]);
+      const nextUser = statuses.find((u, index) => index > currentUserIndex);
+      if (nextUser) {
+        handleSelectUser(nextUser);
       } else {
         closeStatus();
       }
@@ -150,10 +159,12 @@ export default function StatusPage() {
     if (activeStoryIndex > 0) {
       setActiveStoryIndex(prev => prev - 1);
     } else {
-      const currentUserIndex = statuses.findIndex(u => u.id === activeUser.id);
-      const prevUserIndex = (currentUserIndex - 1 + statuses.length) % statuses.length;
-      if (statuses[prevUserIndex]) {
-        handleSelectUser(statuses[prevUserIndex]);
+       const currentUserIndex = statuses.findIndex(u => u.id === activeUser.id);
+       const prevUser = statuses.slice(0, currentUserIndex).reverse().find(u => u.id !== activeUser.id);
+       if (prevUser) {
+        handleSelectUser(prevUser);
+      } else {
+        closeStatus();
       }
     }
   };
@@ -273,3 +284,5 @@ export default function StatusPage() {
     </div>
   );
 }
+
+    
