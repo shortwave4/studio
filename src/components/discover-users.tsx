@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, limit, Query } from 'firebase/firestore';
-import { Geofirestore, geohashQueryBounds } from 'geofirestore';
+import * as geofirestore from 'geofirestore';
 import type { UserProfile } from '@/types';
 import {
   Card,
@@ -25,6 +25,7 @@ export default function DiscoverUsers() {
   const firestore = useFirestore();
   const [suggestedUsers, setSuggestedUsers] = React.useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const Geofirestore = geofirestore.Geofirestore;
 
   React.useEffect(() => {
     const fetchNearbyUsers = async (latitude: number, longitude: number) => {
@@ -112,7 +113,7 @@ export default function DiscoverUsers() {
       });
       fetchWithoutLocation();
     }
-  }, [user?.uid, firestore]);
+  }, [user?.uid, firestore, toast, Geofirestore]);
 
 
   const handleStartChat = () => {

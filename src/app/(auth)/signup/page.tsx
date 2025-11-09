@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -7,7 +8,7 @@ import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
-import { Geofirestore, geohashForLocation, geohashQueryBounds } from 'geofirestore';
+import * as geofirestore from 'geofirestore';
 
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ export default function SignupPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const Geofirestore = geofirestore.Geofirestore;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -62,7 +64,7 @@ export default function SignupPage() {
             name,
             email,
             location: new GeoPoint(latitude, longitude),
-            g: geohashForLocation([latitude, longitude])
+            g: geofirestore.geohashForLocation([latitude, longitude])
           };
           const userRef = doc(firestore, "users", user.uid);
           setDocumentNonBlocking(userRef, userProfile, { merge: true });
