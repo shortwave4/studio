@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import withSerwist from "@serwist/next/build";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -26,4 +27,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

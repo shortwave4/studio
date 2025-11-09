@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser, useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase";
+import { useUser, useAuth, useFirestore, setDocumentNonBlocking, requestPermission } from "@/firebase";
 import { updateProfile } from "firebase/auth";
 import { doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,7 @@ export default function SettingsPage() {
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
+  const [pushEnabled, setPushEnabled] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -29,6 +30,7 @@ export default function SettingsPage() {
       // For now, we'll use a placeholder.
       setBio("Loves hiking and photography.");
     }
+    setPushEnabled(Notification.permission === 'granted');
   }, [user]);
 
   const handleSaveChanges = async () => {
@@ -62,6 +64,31 @@ export default function SettingsPage() {
       });
     }
   };
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      const token = await requestPermission();
+      if (token) {
+        setPushEnabled(true);
+        // You'd save the token to your server here
+        toast({
+          title: "Notifications Enabled",
+          description: "You will now receive push notifications.",
+        });
+      } else {
+         toast({
+          variant: "destructive",
+          title: "Permission Denied",
+          description: "You need to grant permission to enable notifications.",
+        });
+      }
+    } else {
+      // In a real app, you would have logic here to revoke the token on your server.
+      setPushEnabled(false);
+      console.log("Push notifications disabled.");
+    }
+  };
+
 
   return (
     <div className="container mx-auto max-w-3xl">
@@ -143,7 +170,7 @@ export default function SettingsPage() {
                   Receive notifications on your device.
                 </p>
               </div>
-              <Switch defaultChecked />
+              <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} />
             </div>
              <div className="flex items-center justify-between">
               <div>
