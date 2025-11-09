@@ -394,7 +394,7 @@ export default function ChatPage() {
               <div className="flex flex-col">
                 <div
                   className={cn(
-                    'rounded-lg p-3 text-sm',
+                    'rounded-lg',
                      msg.messageType !== 'audio' && 'p-3',
                      msg.messageType === 'audio' && 'p-2',
                     msg.own
