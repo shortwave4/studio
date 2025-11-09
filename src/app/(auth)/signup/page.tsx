@@ -8,7 +8,7 @@ import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
-import * as geofirestore from 'geofirestore';
+import geofirestore from 'geofirestore';
 
 
 import { Button } from "@/components/ui/button";

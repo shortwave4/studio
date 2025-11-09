@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, limit, Query } from 'firebase/firestore';
-import * as geofirestore from 'geofirestore';
+import geofirestore from 'geofirestore';
 import type { UserProfile } from '@/types';
 import {
   Card,
