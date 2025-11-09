@@ -3,7 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Allow authenticated users to list all user profiles for discovery.
-    // Individual document reads are also covered.
+    match /users {
+      allow list: if request.auth != null;
+    }
+
+    // Allow a user to read their own profile and for any authenticated user to read any profile
     // Writes are restricted to the user who owns the document.
     match /users/{userId} {
       allow read: if request.auth != null;
