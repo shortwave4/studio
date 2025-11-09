@@ -16,10 +16,16 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId;
     }
 
-    // Rules for private chat messages
-    match /chats/{chatId}/messages/{messageId} {
+    // Rules for private chats
+    match /chats/{chatId} {
+      // Allow read/list access to the messages subcollection if the user is part of the chat
+      allow list: if request.auth != null && request.auth.uid in chatId.split('_');
+
+      // Rules for individual messages within a private chat
+      match /messages/{messageId} {
         // Only the two users involved in the chat can read or write messages.
         allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
+      }
     }
     
     // Rules for user status updates
@@ -35,7 +41,6 @@ service cloud.firestore {
       // Any authenticated user can read the product list.
       allow list, get: if request.auth != null;
       // Only users marked as admin can write (add, update, delete) products.
-      // Admin role is determined by email address in the application logic, not a Firestore document.
       allow write: if request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
     }
     
