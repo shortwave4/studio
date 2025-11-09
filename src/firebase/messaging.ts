@@ -18,7 +18,7 @@ export const requestPermission = async () => {
       // The VAPID key is a public key used for authentication.
       // You need to generate this in your Firebase project settings.
       // Go to Project Settings -> Cloud Messaging -> Web configuration -> Web Push certificates
-      vapidKey: 'YOUR_VAPID_KEY_HERE', // IMPORTANT: Replace with your actual VAPID key
+      vapidKey: BAnlivzQi-Tp7z3yoKU9z3J6MjIJKHKSzeHa1AKY_i-ykpwST7TNcI8qT4EST54-ghRuyIK1tW472iTlRrrIMPORTANTPORTANT: Replace with your actual VAPID key
     });
     
     if (currentToken) {
