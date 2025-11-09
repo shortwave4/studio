@@ -17,8 +17,9 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId;
 
       // Rules for the status_updates sub-collection
+      // Allow any authenticated user to read status updates.
+      // This is needed for the status page to list all statuses.
       match /status_updates/{statusId} {
-        // Allow any authenticated user to read (get, list) status updates.
         allow read: if request.auth != null;
         // A user can only create, update, or delete their own status updates.
         allow write: if request.auth.uid == userId;
