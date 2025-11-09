@@ -5,12 +5,12 @@ service cloud.firestore {
 
     // Rules for user profiles
     match /users/{userId} {
-      // Any authenticated user can view any user's profile.
+      // Any authenticated user can view any other user's profile.
       allow get: if request.auth != null;
-      // A user can only create, update, or delete their own profile.
+      // A user can only create, update, or delete their own profile data.
       allow write: if request.auth != null && request.auth.uid == userId;
     }
-    
+
     // Allow any authenticated user to list all users. This is necessary for
     // features like the discover page and adding new chat contacts.
     match /users {
@@ -20,10 +20,8 @@ service cloud.firestore {
     // Rules for private chat messages
     // This uses a wildcard to represent the combined user IDs.
     match /chats/{chatId}/messages/{messageId} {
-        // For simplicity in this demo, allow any authenticated user to read/write.
-        // In a production app, you would restrict this to only the two users in the chat.
-        // e.g., allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
-        allow read, write: if request.auth != null;
+        // Only the two users involved in the chat can read or write messages.
+        allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
     }
     
     // Rules for user status updates
@@ -45,9 +43,9 @@ service cloud.firestore {
     // Rules for chat groups
     match /chat_groups/{groupId} {
       // A user can read a group's details if they are a member of that group.
-      // A user can update a group only if they are the creator.
       allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
-      allow update: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      // A user can update a group only if they are the creator.
+      allow update: if request.auth != null && resource.data.creatorId == request.auth.uid;
        // Any authenticated user can create a new group.
       allow create: if request.auth != null;
     }
@@ -64,6 +62,7 @@ service cloud.firestore {
       // Allow any authenticated user to check if another user is an admin.
       // This is needed for the useAdmin hook to function correctly.
       allow get: if request.auth != null;
+      // Only the user themselves can grant themselves admin role through the admin page.
       allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
