@@ -30,9 +30,9 @@ export default function ProductsPage() {
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              <CardTitle className="font-headline text-2xl mb-2">Product Title</CardTitle>
+              <CardTitle className="font-headline text-2xl mb-2">{product.imageHint.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</CardTitle>
               <CardDescription>
-                This is a great product that you will surely love. It has many features and is built with the highest quality materials.
+                {product.description}
               </CardDescription>
             </CardContent>
             <CardFooter>

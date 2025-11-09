@@ -147,7 +147,7 @@ export default function ChatPage() {
   const handleSelectChat = (contact: UserProfile) => {
     setSelectedChat({
       ...contact,
-      lastMessage: '...',
+      lastMessage: mockMessages.slice(-1)[0]?.text || '...',
     });
   };
 
@@ -156,8 +156,8 @@ export default function ChatPage() {
     if (!newMessage.trim() || !selectedChat || !user) return;
 
     // This part is commented out to prevent permission errors
-    const chatId = getChatId(user.uid, selectedChat.id);
-    const messagesCol = collection(firestore, 'chats', chatId, 'messages');
+    // const chatId = getChatId(user.uid, selectedChat.id);
+    // const messagesCol = collection(firestore, 'chats', chatId, 'messages');
     
     // Optimistic update
     const optimisticId = `optimistic-${Date.now()}`;
@@ -172,19 +172,25 @@ export default function ChatPage() {
 
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
 
-    addDocumentNonBlocking(messagesCol, {
-      text: newMessage,
-      senderId: user.uid,
-      timestamp: serverTimestamp(),
-    }).then(() => {
-        // This logic will kick in if we switch back to live data
-        // For now, we manually simulate the sent status
-        setTimeout(() => {
-             setOptimisticMessages(prev => prev.map(msg => 
-                msg.id === optimisticId ? { ...msg, status: 'sent' } : msg
-            ));
-        }, 1000);
-    });
+    // addDocumentNonBlocking(messagesCol, {
+    //   text: newMessage,
+    //   senderId: user.uid,
+    //   timestamp: serverTimestamp(),
+    // }).then(() => {
+    //     // This logic will kick in if we switch back to live data
+    //     // For now, we manually simulate the sent status
+    //     setTimeout(() => {
+    //          setOptimisticMessages(prev => prev.map(msg => 
+    //             msg.id === optimisticId ? { ...msg, status: 'sent' } : msg
+    //         ));
+    //     }, 1000);
+    // });
+    
+    // Simulate sent status
+     setTimeout(() => {
+            setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
+     }, 1000);
+
 
     setNewMessage('');
   };
