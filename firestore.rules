@@ -14,6 +14,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if request.auth != null;
       allow write: if request.auth.uid == userId;
+
+      // Rules for user status updates subcollection
+      match /status_updates/{statusId} {
+        // Any authenticated user can read status updates.
+        allow read: if request.auth != null;
+        // A user can only create, update, or delete their own status updates.
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // Rules for private chats
@@ -28,14 +36,6 @@ service cloud.firestore {
       }
     }
     
-    // Rules for user status updates
-    match /users/{userId}/status_updates/{statusId} {
-      // Any authenticated user can read status updates.
-      allow get, list: if request.auth != null;
-      // A user can only create, update, or delete their own status updates.
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
     // Rules for affiliate products
     match /affiliate_products/{productId} {
       // Any authenticated user can read the product list.
