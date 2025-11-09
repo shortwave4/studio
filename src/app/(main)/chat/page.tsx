@@ -33,17 +33,12 @@ import type { UserProfile } from '@/types';
 import type { ChatContact, Message } from '@/types/chat';
 import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
+import { useCollection, WithId } from '@/firebase/firestore/use-collection';
+import { collection } from 'firebase/firestore';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
 }
-
-const mockMessages: Omit<Message, 'own' | 'status'>[] = [
-  { id: 'm1', senderId: 'user1', text: 'Hey, how is it going?', timestamp: new Date(Date.now() - 1000 * 60 * 5) },
-  { id: 'm2', senderId: 'currentUser', text: 'Doing great! How about you?', timestamp: new Date(Date.now() - 1000 * 60 * 4) },
-  { id: 'm3', senderId: 'user1', text: 'Awesome! I was thinking we could grab a coffee sometime.', timestamp: new Date(Date.now() - 1000 * 60 * 3) },
-];
-
 
 export default function ChatPage() {
   const isMobile = useIsMobile();
@@ -57,92 +52,88 @@ export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
+  const [allMessages, setAllMessages] = useState<Message[]>([]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setUsersLoading(true);
-      try {
-        // For chat, we can just get default suggestions
-        const suggestions = await suggestUsersByLocation({
-          latitude: 37.7749,
-          longitude: -122.4194,
-        });
-        const filteredSuggestions = suggestions.filter(u => u.userId !== user?.uid);
-        setContacts(filteredSuggestions);
-      } catch (error) {
-        console.error("Failed to fetch users for chat:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not load users for chat.",
-        });
-      } finally {
-        setUsersLoading(false);
-      }
-    };
-    if (user?.uid) {
-      fetchUsers();
-    }
-  }, [user?.uid, toast]);
+  const usersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'users');
+  }, [firestore]);
+  const { data: usersData, isLoading: isUsersLoading } = useCollection<UserProfile>(usersCollection);
 
-  const messagesData = useMemo(() => {
-    if (!user || !selectedChat) return [];
-    return mockMessages.map(msg => ({
-      ...msg,
-      senderId: msg.senderId === 'currentUser' ? user.uid : selectedChat.id,
-    }));
+  const chatId = useMemo(() => {
+    if (!user || !selectedChat) return null;
+    return getChatId(user.uid, selectedChat.id);
   }, [user, selectedChat]);
-
-
-  useEffect(() => {
-    // When a new chat is selected, clear optimistic messages
-    setOptimisticMessages([]);
-  }, [selectedChat]);
   
-  // Update optimistic messages once they arrive from Firestore (this part is now moot with mock data but harmless)
+  const messagesCollection = useMemoFirebase(() => {
+    if (!firestore || !chatId) return null;
+    return collection(firestore, 'chats', chatId, 'messages');
+  }, [firestore, chatId]);
+
+  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesCollection);
+
   useEffect(() => {
-    if (!messagesData) return;
-    const sentMessageIds = messagesData.map(m => m.id);
-    const newOptimisticMessages = optimisticMessages.filter(
-      optMsg => !sentMessageIds.includes(optMsg.id)
-    );
-    if (newOptimisticMessages.length < optimisticMessages.length) {
-      setOptimisticMessages(newOptimisticMessages);
+    if (!isUsersLoading && usersData) {
+      const filteredUsers = usersData.filter(u => u.id !== user?.uid);
+      setContacts(filteredUsers);
+      setUsersLoading(false);
     }
-  }, [messagesData, optimisticMessages]);
+  }, [isUsersLoading, usersData, user?.uid]);
+
+  const getLastMessage = (contactId: string): { text: string; time: string } => {
+    const contactChatId = user ? getChatId(user.uid, contactId) : '';
+    const relevantMessages = (messagesData || []).filter(m => getChatId(m.senderId, user?.uid || '') === contactChatId || getChatId(m.senderId, contactId) === contactChatId);
+    
+    const lastMsg = relevantMessages
+      .sort((a, b) => ((b.timestamp as Timestamp)?.toDate()?.getTime() || 0) - ((a.timestamp as Timestamp)?.toDate()?.getTime() || 0))[0];
+
+    if (lastMsg) {
+      return {
+        text: lastMsg.text,
+        time: getTimeString(lastMsg.timestamp)
+      };
+    }
+    return { text: 'Click to start chatting!', time: '' };
+  };
+
+  useEffect(() => {
+    if (!messagesLoading && messagesData) {
+        const processedMessages = messagesData.map(msg => ({
+            ...msg,
+            own: msg.senderId === user?.uid,
+            status: 'sent',
+        }) as Message);
+        setAllMessages(processedMessages);
+    }
+  }, [messagesData, messagesLoading, user?.uid]);
+
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('div:first-child');
+        if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+    }
+  }, [allMessages, optimisticMessages]);
 
 
   const messages: Message[] = useMemo(() => {
     if (!user) return [];
-    const combinedMessages: Message[] = [];
+    const combined = [...allMessages];
   
-    if (messagesData) {
-      messagesData.forEach((msg) => {
-        combinedMessages.push({
-          ...msg,
-          own: msg.senderId === user.uid,
-          status: 'sent',
-        });
-      });
-    }
-  
-    // Filter optimistic messages to only include those for the current chat
-    const relevantOptimisticMessages = optimisticMessages.filter(
-      (optMsg) =>
-        selectedChat &&
-        user && // ensure user is not null
-        getChatId(optMsg.senderId, selectedChat.id) === getChatId(user.uid, selectedChat.id)
+    const relevantOptimistic = optimisticMessages.filter(optMsg =>
+      selectedChat && getChatId(optMsg.senderId, selectedChat.id) === chatId
     );
   
-    // Add optimistic messages that are not yet in the 'sent' messages
-    relevantOptimisticMessages.forEach((optMsg) => {
-      if (!combinedMessages.some((m) => m.id === optMsg.id)) {
-        combinedMessages.push(optMsg);
+    relevantOptimistic.forEach(optMsg => {
+      if (!combined.some(m => m.id === optMsg.id)) {
+        combined.push(optMsg);
       }
     });
   
-    return combinedMessages.sort((a, b) => (a.timestamp as Date).getTime() - (b.timestamp as Date).getTime());
-  }, [messagesData, optimisticMessages, user, selectedChat]);
+    return combined.sort((a, b) => ((a.timestamp as Date)?.getTime() || 0) - ((b.timestamp as Date)?.getTime() || 0));
+  }, [allMessages, optimisticMessages, user, selectedChat, chatId]);
 
 
   useEffect(() => {
@@ -164,6 +155,7 @@ export default function ChatPage() {
   }, [messages]);
 
   const handleSelectChat = (contact: UserProfile) => {
+    setOptimisticMessages([]); // Clear optimistic messages for previous chat
     setSelectedChat({
       ...contact,
       lastMessage: 'Click to start chatting!',
@@ -172,15 +164,10 @@ export default function ChatPage() {
 
   const handleSendMessage = (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat || !user) return;
-
-    // This part is commented out to prevent permission errors
-    // const chatId = getChatId(user.uid, selectedChat.id);
-    // const messagesCol = collection(firestore, 'chats', chatId, 'messages');
+    if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
     
-    // Optimistic update
     const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticMessage: Message = {
+    const newOptimisticMessage: Message = {
       id: optimisticId,
       text: newMessage,
       senderId: user.uid,
@@ -189,28 +176,19 @@ export default function ChatPage() {
       status: 'sending',
     };
 
-    setOptimisticMessages(prev => [...prev, optimisticMessage]);
+    setOptimisticMessages(prev => [...prev, newOptimisticMessage]);
 
-    // addDocumentNonBlocking(messagesCol, {
-    //   text: newMessage,
-    //   senderId: user.uid,
-    //   timestamp: serverTimestamp(),
-    // }).then(() => {
-    //     // This logic will kick in if we switch back to live data
-    //     // For now, we manually simulate the sent status
-    //     setTimeout(() => {
-    //          setOptimisticMessages(prev => prev.map(msg => 
-    //             msg.id === optimisticId ? { ...msg, status: 'sent' } : msg
-    //         ));
-    //     }, 1000);
-    // });
-    
-    // Simulate sent status
-     setTimeout(() => {
-            mockMessages.push({ id: optimisticId, senderId: 'currentUser', text: newMessage, timestamp: new Date() });
+    addDocumentNonBlocking(messagesCollection, {
+      text: newMessage,
+      senderId: user.uid,
+      timestamp: serverTimestamp(),
+    }).then(() => {
+        // The message is now in Firestore and the useCollection hook will update the state.
+        // We can remove the optimistic message.
+        setTimeout(() => {
             setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
-     }, 1000);
-
+        }, 1000); // Give it a second for effect
+    });
 
     setNewMessage('');
   };
@@ -246,29 +224,35 @@ export default function ChatPage() {
             ))}
           </div>
         ) : (
-          contacts?.map((contact) => (
-            <div
-              key={contact.id}
-              className={cn(
-                'flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
-                selectedChat?.id === contact.id && 'bg-accent/80'
-              )}
-              onClick={() => handleSelectChat(contact)}
-            >
-              <Avatar>
-                <AvatarImage
-                  src={`https://picsum.photos/seed/${contact.id}/200`}
-                />
-                <AvatarFallback>{contact.name?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-grow overflow-hidden">
-                <p className="font-semibold truncate">{contact.name}</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  Click to start chatting!
-                </p>
+          contacts?.map((contact) => {
+             const lastMessageInfo = getLastMessage(contact.id);
+            return (
+              <div
+                key={contact.id}
+                className={cn(
+                  'flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
+                  selectedChat?.id === contact.id && 'bg-accent/80'
+                )}
+                onClick={() => handleSelectChat(contact)}
+              >
+                <Avatar>
+                  <AvatarImage
+                    src={`https://picsum.photos/seed/${contact.id}/200`}
+                  />
+                  <AvatarFallback>{contact.name?.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-grow overflow-hidden">
+                  <p className="font-semibold truncate">{contact.name}</p>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {lastMessageInfo.text}
+                  </p>
+                </div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    {lastMessageInfo.time}
+                </div>
               </div>
-            </div>
-          ))
+            );
+        })
         )}
       </ScrollArea>
     </div>
@@ -360,10 +344,10 @@ export default function ChatPage() {
             disabled={!selectedChat}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            <Button variant="ghost" size="icon" type="button">
+            <Button variant="ghost" size="icon" type="button" disabled>
               <Paperclip className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon" type="button">
+            <Button variant="ghost" size="icon" type="button" disabled>
               <Mic className="w-5 h-5" />
             </Button>
             <Button
@@ -413,3 +397,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
