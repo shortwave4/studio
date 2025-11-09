@@ -10,8 +10,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { initializeFirebase } from '@/firebase';
-import { getDocs, collection } from 'firebase/firestore';
+import {initializeApp, getApps, App} from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import type { UserProfile } from '@/types';
 
 // Haversine distance function
@@ -33,6 +33,16 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
 function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
+
+// Helper to initialize Firebase Admin SDK on the server
+let adminApp: App;
+if (!getApps().length) {
+  adminApp = initializeApp();
+} else {
+  adminApp = getApps()[0];
+}
+
+const firestoreDb = getFirestore(adminApp);
 
 const SuggestUsersByLocationInputSchema = z.object({
   latitude: z
@@ -81,17 +91,16 @@ const suggestUsersByLocationFlow = ai.defineFlow(
     outputSchema: SuggestUsersByLocationOutputSchema,
   },
   async (input) => {
-    // In a real application, you would fetch users from your database (e.g., Firestore)
-    // and then could optionally use an LLM to rank or filter them.
-    const { firestore } = initializeFirebase();
-    const usersCollection = collection(firestore, 'users');
-    const usersSnapshot = await getDocs(usersCollection);
+    // Fetch users from Firestore using the Admin SDK
+    const usersCollection = firestoreDb.collection('users');
+    const usersSnapshot = await usersCollection.get();
     const users: UserProfile[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
 
     const usersWithLocation = users.filter(user => user.location);
     
-    // Sort users by proximity to the input location (Euclidean distance).
+    // Sort users by proximity to the input location
     usersWithLocation.sort((a, b) => {
+      if (!a.location || !b.location) return 0;
       const distanceA = getDistance(
         a.location!.latitude,
         a.location!.longitude,
