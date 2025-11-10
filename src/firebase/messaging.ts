@@ -21,7 +21,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       console.log('Notification permission granted.');
       
       const currentToken = await getToken(messaging, {
-        vapidKey: 'BAnlivzQi-Tp7z3yoKU9z3J6MjIJKHKSzeHa1AKY_i-ykpwST7TNcI8qT4EST54-ghRuyIK1tW472iTlRrrIMPORTANTPORTANT' // IMPORTANT: Replace with your actual VAPID key
+        vapidKey: 'BAnlivzQi-Tp7z3yoKU9z3J6MjIJKHKSzeHa1AKY_i-ykpwST7TNcI8qT4EST54-ghRuyIK1tW472iTlRrrIeF8' // IMPORTANT: Replace with your actual VAPID key
       });
       
       if (currentToken) {
