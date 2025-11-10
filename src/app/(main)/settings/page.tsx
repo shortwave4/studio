@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useUser, useAuth, useFirestore, useStorage, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { updateProfile } from "firebase/auth";
 import { doc, GeoPoint, updateDoc } from "firebase/firestore";
@@ -34,7 +33,6 @@ export default function SettingsPage() {
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   
-  // State to force re-render of avatar
   const [avatarKey, setAvatarKey] = useState(Date.now());
 
 
@@ -75,7 +73,7 @@ export default function SettingsPage() {
         title: "Success!",
         description: "Your profile has been updated.",
       });
-    } catch (error) => {
+    } catch (error) {
       console.error("Error updating profile:", error);
       toast({
         variant: "destructive",
@@ -130,7 +128,7 @@ export default function SettingsPage() {
     if (!user || typeof window === 'undefined' || !('Notification' in window)) {
       return;
     }
-  
+
     if (checked) {
       const token = await requestPermission(firestore, user.uid);
       if (token) {
@@ -142,7 +140,6 @@ export default function SettingsPage() {
         });
       } else {
         const currentPermission = Notification.permission;
-        setPushEnabled(false);
         setPermissionDenied(currentPermission === 'denied');
         if (currentPermission === 'denied') {
             toast({
@@ -153,6 +150,7 @@ export default function SettingsPage() {
         }
       }
     } else {
+      // Logic to disable push notifications would go here (e.g., remove token from server)
       setPushEnabled(false);
     }
   };
@@ -317,9 +315,9 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Push Notifications (FCM)</Label>
+                <Label>Broadcast Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Receive notifications for chats and direct messages.
+                  Receive broadcast messages from the admin.
                 </p>
                  {permissionDenied && (
                   <p className="text-xs text-destructive mt-1">
@@ -328,29 +326,6 @@ export default function SettingsPage() {
                 )}
               </div>
               <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} disabled={permissionDenied} aria-readonly={isSaving} />
-            </div>
-            <div className="flex items-center justify-between" style={{ display: 'none' }}>
-              <div>
-                <Label>Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive important notifications via email.
-                </p>
-              </div>
-              <Switch disabled />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Broadcast Notifications (PushAll)</Label>
-                <p className="text-sm text-muted-foreground">
-                  Subscribe to receive broadcast messages from the admin.
-                </p>
-              </div>
-              <Button asChild variant="outline">
-                <Link href="https://pushall.ru/?fs=5965" target="_blank">
-                  <BellRing className="mr-2 h-4 w-4" />
-                  Subscribe
-                </Link>
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -364,3 +339,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
