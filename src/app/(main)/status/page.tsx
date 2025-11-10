@@ -100,6 +100,17 @@ export default function StatusPage() {
 
   }, [users, firestore, usersLoading]);
 
+  const handleSelectUser = useCallback((user: StatusUser) => {
+    setActiveUser(user);
+    setActiveStoryIndex(0);
+    setProgress(0);
+    setIsStoryLoading(true);
+  }, []);
+
+  const closeStatus = useCallback(() => {
+      setActiveUser(null);
+  }, []);
+
   const handleNextStory = useCallback(() => {
     if (!activeUser) return;
     setIsStoryLoading(true);
@@ -114,7 +125,7 @@ export default function StatusPage() {
         closeStatus();
       }
     }
-  }, [activeUser, activeStoryIndex, statuses]);
+  }, [activeUser, activeStoryIndex, statuses, handleSelectUser, closeStatus]);
 
   const startTimer = useCallback(() => {
     if (!activeUser) return;
@@ -173,18 +184,6 @@ export default function StatusPage() {
     }
   };
 
-
-  const handleSelectUser = (user: StatusUser) => {
-    setActiveUser(user);
-    setActiveStoryIndex(0);
-    setProgress(0);
-    setIsStoryLoading(true);
-  };
-  
-  const closeStatus = () => {
-      setActiveUser(null);
-  }
-
   const handleAddStatus = () => {
     // In a real app, this would open a modal to upload a new status.
     // For now, it will just log to the console.
@@ -196,7 +195,7 @@ export default function StatusPage() {
     return (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onClick={closeStatus}>
             <div className="relative w-full max-w-sm h-full max-h-[95vh] md:max-h-[80vh] aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-                {isStoryLoading && <Skeleton className="absolute inset-0 w-full h-full" />}
+                {isStoryLoading && <Skeleton className="absolute inset-0 w-full h-full animate-pulse" />}
                 <Image
                     src={activeStory.mediaUrl}
                     alt={`Status from ${activeUser.name}`}
