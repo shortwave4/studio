@@ -46,6 +46,17 @@ export default function SettingsPage() {
       const currentPermission = Notification.permission;
       setPushEnabled(currentPermission === 'granted');
       setPermissionDenied(currentPermission === 'denied');
+
+      // Add a listener for permission changes
+      if (navigator.permissions) {
+        navigator.permissions.query({name: 'notifications'}).then((permissionStatus) => {
+          permissionStatus.onchange = () => {
+            const newPermission = permissionStatus.state;
+            setPushEnabled(newPermission === 'granted');
+            setPermissionDenied(newPermission === 'denied');
+          };
+        });
+      }
     }
   }, [user]);
 
@@ -136,7 +147,6 @@ export default function SettingsPage() {
         });
       } else {
         const currentPermission = Notification.permission;
-        setPushEnabled(false); 
         setPermissionDenied(currentPermission === 'denied');
         if (currentPermission === 'denied') {
             toast({
@@ -144,6 +154,8 @@ export default function SettingsPage() {
               title: "Permission Denied",
               description: "You need to grant permission in your browser settings to enable notifications.",
             });
+        } else if (currentPermission === 'prompt') {
+           // User dismissed the prompt, do nothing to the UI
         } else {
            toast({
               variant: "destructive",
@@ -339,7 +351,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <Button asChild variant="outline">
-                <a href="https://pushall.com/p/10182" target="_blank" rel="noopener noreferrer">
+                <a href="https://pushall.ru/?fs=5965" target="_blank" rel="noopener noreferrer">
                     <Bell className="mr-2 h-4 w-4" />
                     Subscribe
                 </a>

@@ -80,7 +80,7 @@ export default function MainLayout({
                 {/* Can add breadcrumbs or search here */}
               </div>
               <Button variant="ghost" size="icon" asChild>
-                <Link href="https://pushall.com/p/10182" target="_blank">
+                <Link href="https://pushall.ru/?fs=5965" target="_blank">
                   <Bell />
                   <span className="sr-only">Subscribe to PushAll</span>
                 </Link>
