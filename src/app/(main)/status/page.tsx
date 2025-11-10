@@ -77,7 +77,7 @@ export default function StatusPage() {
             return {
               id: u.id,
               name: u.name,
-              avatarUrl: `https://picsum.photos/seed/${u.id}/200`,
+              avatarUrl: u.profilePictureUrl || `https://picsum.photos/seed/${u.id}/200`,
               stories,
               hasNew: true, // You could add logic to determine if they are "new"
             };
@@ -248,10 +248,12 @@ export default function StatusPage() {
       {(statusesLoading || usersLoading) ? (
          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="relative aspect-[9/16] rounded-lg overflow-hidden bg-muted animate-pulse">
-                <div className="absolute bottom-0 left-0 p-3 w-full">
-                    <div className="w-10 h-10 mb-2 rounded-full bg-muted-foreground/20" />
-                    <div className="h-4 w-3/4 rounded bg-muted-foreground/20" />
+              <div key={i} className="relative aspect-[9/16] rounded-lg overflow-hidden">
+                <Skeleton className="w-full h-full" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                 <div className="absolute bottom-0 left-0 p-3 w-full">
+                    <Skeleton className="w-10 h-10 mb-2 rounded-full" />
+                    <Skeleton className="h-4 w-3/4 rounded" />
                 </div>
               </div>
             ))}
@@ -291,3 +293,5 @@ export default function StatusPage() {
     </div>
   );
 }
+
+    
