@@ -75,7 +75,7 @@ export default function SettingsPage() {
         title: "Success!",
         description: "Your profile has been updated.",
       });
-    } catch (error) {
+    } catch (error) => {
       console.error("Error updating profile:", error);
       toast({
         variant: "destructive",
@@ -141,9 +141,8 @@ export default function SettingsPage() {
           description: "You will now receive push notifications.",
         });
       } else {
-        // Don't setPushEnabled(false) here, as it causes the switch to feel "stuck"
-        // The permission state will be updated by the effect hook anyway.
         const currentPermission = Notification.permission;
+        setPushEnabled(false);
         setPermissionDenied(currentPermission === 'denied');
         if (currentPermission === 'denied') {
             toast({
@@ -154,8 +153,6 @@ export default function SettingsPage() {
         }
       }
     } else {
-      // Logic for disabling notifications can be added here if needed in the future.
-      // For now, users disable it through browser settings, which this component reflects.
       setPushEnabled(false);
     }
   };
@@ -332,7 +329,7 @@ export default function SettingsPage() {
               </div>
               <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} disabled={permissionDenied} aria-readonly={isSaving} />
             </div>
-             <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between" style={{ display: 'none' }}>
               <div>
                 <Label>Email Notifications</Label>
                 <p className="text-sm text-muted-foreground">
@@ -367,4 +364,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
