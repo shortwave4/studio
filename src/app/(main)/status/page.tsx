@@ -10,6 +10,7 @@ import { PlusCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, query, where, Timestamp, getDocs } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type StatusStory = {
   id: string;
@@ -35,6 +36,7 @@ export default function StatusPage() {
   const [progress, setProgress] = useState(0);
   const timerRef = useRef<NodeJS.Timeout>();
   const progressTimerRef = useRef<NodeJS.Timeout>();
+  const [isStoryLoading, setIsStoryLoading] = useState(true);
   
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: users, isLoading: usersLoading } = useCollection(usersCollectionRef);
@@ -100,6 +102,7 @@ export default function StatusPage() {
 
   const handleNextStory = useCallback(() => {
     if (!activeUser) return;
+    setIsStoryLoading(true);
     if (activeStoryIndex < activeUser.stories.length - 1) {
       setActiveStoryIndex(prev => prev + 1);
     } else {
@@ -141,7 +144,7 @@ export default function StatusPage() {
   }, [activeUser, activeStoryIndex, handleNextStory]);
 
   useEffect(() => {
-    if (activeUser) {
+    if (activeUser && !isStoryLoading) {
       startTimer();
     } else {
       clearTimeout(timerRef.current);
@@ -152,10 +155,11 @@ export default function StatusPage() {
       clearTimeout(timerRef.current);
       clearInterval(progressTimerRef.current);
     };
-  }, [activeUser, activeStoryIndex, startTimer]);
+  }, [activeUser, activeStoryIndex, startTimer, isStoryLoading]);
   
   const handlePrevStory = () => {
     if (!activeUser) return;
+    setIsStoryLoading(true);
     if (activeStoryIndex > 0) {
       setActiveStoryIndex(prev => prev - 1);
     } else {
@@ -174,6 +178,7 @@ export default function StatusPage() {
     setActiveUser(user);
     setActiveStoryIndex(0);
     setProgress(0);
+    setIsStoryLoading(true);
   };
   
   const closeStatus = () => {
@@ -191,11 +196,13 @@ export default function StatusPage() {
     return (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onClick={closeStatus}>
             <div className="relative w-full max-w-sm h-full max-h-[95vh] md:max-h-[80vh] aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                {isStoryLoading && <Skeleton className="absolute inset-0 w-full h-full" />}
                 <Image
                     src={activeStory.mediaUrl}
                     alt={`Status from ${activeUser.name}`}
                     fill
-                    className="object-cover"
+                    className={cn("object-cover", isStoryLoading ? "opacity-0" : "opacity-100 transition-opacity duration-300")}
+                    onLoad={() => setIsStoryLoading(false)}
                 />
                  <div className="absolute inset-x-0 top-0 p-3 z-20 bg-gradient-to-b from-black/50 to-transparent">
                     <div className="flex items-center gap-2 mb-2">
@@ -284,5 +291,3 @@ export default function StatusPage() {
     </div>
   );
 }
-
-    
