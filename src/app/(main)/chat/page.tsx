@@ -133,16 +133,18 @@ export default function ChatPage() {
   }, [messagesData, user?.uid]);
 
   const getLastMessage = (contactId: string): { text: string; time: string } => {
-    // This function depends on messagesData from the useCollection hook for the selected chat.
-    // It is not designed to show last messages for all contacts in the list simultaneously
-    // unless we fetch all chats, which we are not doing.
-    // So, we only compute this for the *selected* chat.
-    if (!selectedChat || contactId !== selectedChat.id || !messagesData || messagesData.length === 0) {
-      return { text: 'Click to start chatting!', time: '' };
+    const relevantMessages = messagesData?.filter(msg => {
+        const chatParticipants = getChatId(msg.senderId, contactId);
+        const currentChatId = getChatId(user!.uid, contactId);
+        return chatParticipants === currentChatId;
+    });
+
+    if (!relevantMessages || relevantMessages.length === 0) {
+        return { text: 'Click to start chatting!', time: '' };
     }
-  
-    const lastMsg = messagesData[messagesData.length - 1];
-  
+
+    const lastMsg = relevantMessages[relevantMessages.length - 1];
+    
     if (lastMsg) {
       let text = 'Click to start chatting!';
       switch (lastMsg.messageType) {
@@ -165,6 +167,7 @@ export default function ChatPage() {
     
     return { text: 'Click to start chatting!', time: '' };
   };
+
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -344,7 +347,7 @@ export default function ChatPage() {
               >
                 <Avatar>
                   <AvatarImage
-                    src={`https://picsum.photos/seed/${contact.id}/200`}
+                    src={contact.profilePictureUrl || `https://picsum.photos/seed/${contact.id}/200`}
                   />
                   <AvatarFallback>{contact.name?.charAt(0)}</AvatarFallback>
                 </Avatar>
@@ -381,7 +384,7 @@ export default function ChatPage() {
         )}
         <Avatar>
           <AvatarImage
-            src={`https://picsum.photos/seed/${selectedChat.id}/200`}
+             src={selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`}
           />
           <AvatarFallback>{selectedChat.name?.charAt(0)}</AvatarFallback>
         </Avatar>
@@ -396,7 +399,14 @@ export default function ChatPage() {
       {/* Messages */}
       <ScrollArea className="flex-grow p-4 bg-background/30" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
-          {messages.map((msg, index) => (
+          {messages.map((msg, index) => {
+             const avatarSrc = msg.own
+                ? user?.photoURL || `https://picsum.photos/seed/${user?.uid}/200`
+                : selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`;
+            const avatarFallback = msg.own
+                ? user?.displayName?.charAt(0)
+                : selectedChat.name?.charAt(0);
+            return (
             <div
               key={msg.id || index}
               className={cn(
@@ -405,14 +415,8 @@ export default function ChatPage() {
               )}
             >
               <Avatar className="w-8 h-8">
-                <AvatarImage
-                  src={`https://picsum.photos/seed/${msg.senderId}/200`}
-                />
-                <AvatarFallback>
-                  {msg.own && user
-                    ? user.displayName?.charAt(0)
-                    : selectedChat.name?.charAt(0)}
-                </AvatarFallback>
+                <AvatarImage src={avatarSrc} />
+                <AvatarFallback>{avatarFallback}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
                 <div
@@ -445,7 +449,7 @@ export default function ChatPage() {
                 </p>
               </div>
             </div>
-          ))}
+          )})}
            {isUploading && (
              <div className="flex max-w-[75%] gap-2 ml-auto flex-row-reverse opacity-50">
                <Avatar className="w-8 h-8">
