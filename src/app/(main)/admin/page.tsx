@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -14,9 +14,9 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Info } from 'lucide-react';
+import { Shield, Send, BellRing, Info, Megaphone } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
-import { collection } from 'firebase/firestore';
+import { collection, serverTimestamp } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
@@ -36,6 +36,10 @@ export default function AdminPage() {
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
   const [isSending, setIsSending] = useState(false);
+  
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
 
   useEffect(() => {
     if (usersData) {
@@ -104,6 +108,43 @@ export default function AdminPage() {
       setIsSending(false);
     }
   };
+  
+  const handleSendAnnouncement = async () => {
+    if (!announcementTitle || !announcementMessage || !user) {
+        toast({
+            variant: 'destructive',
+            title: 'Missing fields',
+            description: 'Please enter a title and message for the announcement.',
+        });
+        return;
+    }
+    setIsSendingAnnouncement(true);
+    try {
+        const announcementsCollection = collection(firestore, 'announcements');
+        await addDocumentNonBlocking(announcementsCollection, {
+            title: announcementTitle,
+            message: announcementMessage,
+            adminId: user.uid,
+            timestamp: serverTimestamp(),
+        });
+
+        toast({
+            title: 'Announcement Sent',
+            description: 'The announcement has been sent to all users.',
+        });
+        setAnnouncementTitle('');
+        setAnnouncementMessage('');
+    } catch (error) {
+        console.error('Failed to send announcement', error);
+        toast({
+            variant: 'destructive',
+            title: 'Send Failed',
+            description: 'An error occurred while sending the announcement.',
+        });
+    } finally {
+        setIsSendingAnnouncement(false);
+    }
+  };
 
 
   return (
@@ -140,6 +181,36 @@ export default function AdminPage() {
 
         {isAdmin && (
           <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Megaphone className="h-5 w-5"/>
+                  Send In-App Announcement
+                </CardTitle>
+                <CardDescription>
+                  Broadcast a message that will appear within the app for all users.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  placeholder="Announcement Title"
+                  value={announcementTitle}
+                  onChange={(e) => setAnnouncementTitle(e.target.value)}
+                  disabled={isSendingAnnouncement}
+                />
+                <Textarea
+                  placeholder="Announcement Message"
+                  value={announcementMessage}
+                  onChange={(e) => setAnnouncementMessage(e.target.value)}
+                  disabled={isSendingAnnouncement}
+                />
+                <Button onClick={handleSendAnnouncement} disabled={isSendingAnnouncement}>
+                  <Send className="mr-2 h-4 w-4" />
+                  {isSendingAnnouncement ? 'Sending...' : 'Send Announcement'}
+                </Button>
+              </CardContent>
+            </Card>
+
              <Alert>
               <Info className="h-4 w-4" />
               <AlertTitle>How FCM Tokens Work</AlertTitle>
