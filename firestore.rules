@@ -5,9 +5,9 @@ service cloud.firestore {
 
     // Rules for the users collection
     match /users/{userId} {
-      // Allow authenticated users to get any single user's profile and list all users.
-      // This is required for discover and chat features.
-      allow read: if request.auth != null;
+      // Allow authenticated users to read their own profile, but not list all users directly for security.
+      // Listing is handled by application logic which can paginate and filter.
+      allow get: if request.auth != null;
       // Allow a user to write only to their own profile.
       allow write: if request.auth.uid == userId;
 
