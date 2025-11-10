@@ -133,8 +133,15 @@ export default function ChatPage() {
   }, [messagesData, user?.uid]);
 
   const getLastMessage = (contactId: string): { text: string; time: string } => {
-    const relevantMessages = messagesData?.filter(m => getChatId(m.senderId, contactId) === getChatId(user!.uid, contactId));
-    const lastMsg = relevantMessages?.[relevantMessages.length - 1];
+    // This function depends on messagesData from the useCollection hook for the selected chat.
+    // It is not designed to show last messages for all contacts in the list simultaneously
+    // unless we fetch all chats, which we are not doing.
+    // So, we only compute this for the *selected* chat.
+    if (!selectedChat || contactId !== selectedChat.id || !messagesData || messagesData.length === 0) {
+      return { text: 'Click to start chatting!', time: '' };
+    }
+  
+    const lastMsg = messagesData[messagesData.length - 1];
   
     if (lastMsg) {
       let text = 'Click to start chatting!';
@@ -155,6 +162,7 @@ export default function ChatPage() {
         time: getTimeString(lastMsg.timestamp)
       };
     }
+    
     return { text: 'Click to start chatting!', time: '' };
   };
 
@@ -532,3 +540,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
