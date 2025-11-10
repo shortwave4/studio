@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { BellRing, MapPin, Camera } from "lucide-react";
+import { BellRing, MapPin, Camera, Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
 
@@ -39,9 +39,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       setName(user.displayName || "");
-      // In a real app, you'd fetch the bio from their Firestore profile
-      // For now, we'll use a placeholder.
-      setBio("Loves hiking and photography.");
+      setBio(user.bio || "Loves hiking and photography.");
     }
     // Check initial notification permission status only on client
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -62,10 +60,8 @@ export default function SettingsPage() {
     }
     setIsSaving(true);
     try {
-      // Update display name in Firebase Auth
       await updateProfile(auth.currentUser, { displayName: name });
 
-      // Update bio in Firestore (non-blocking)
       const userRef = doc(firestore, "users", user.uid);
       updateDocumentNonBlocking(userRef, { name: name, bio: bio });
 
@@ -136,10 +132,11 @@ export default function SettingsPage() {
         setPermissionDenied(false);
         toast({
           title: "Notifications Enabled",
-          description: "You will now receive push notifications.",
+          description: "You will now receive broadcast notifications from the admin.",
         });
       } else {
         const currentPermission = Notification.permission;
+        setPushEnabled(false); 
         setPermissionDenied(currentPermission === 'denied');
         if (currentPermission === 'denied') {
             toast({
@@ -147,10 +144,17 @@ export default function SettingsPage() {
               title: "Permission Denied",
               description: "You need to grant permission in your browser settings to enable notifications.",
             });
+        } else {
+           toast({
+              variant: "destructive",
+              title: "Token Error",
+              description: "Could not get a notification token. Please try again.",
+            });
         }
       }
     } else {
-      // Logic to disable push notifications would go here (e.g., remove token from server)
+      // This part is for disabling. We just update the UI state.
+      // True disabling would require removing the token from Firestore.
       setPushEnabled(false);
     }
   };
@@ -188,7 +192,7 @@ export default function SettingsPage() {
             description: "Your new profile picture has been saved.",
         });
         
-        setAvatarKey(Date.now()); // Force re-render
+        setAvatarKey(Date.now());
         setIsCropperOpen(false);
 
     } catch (error) {
@@ -317,7 +321,7 @@ export default function SettingsPage() {
               <div>
                 <Label>Broadcast Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Receive broadcast messages from the admin.
+                  Receive broadcast messages from the admin via FCM.
                 </p>
                  {permissionDenied && (
                   <p className="text-xs text-destructive mt-1">
@@ -326,6 +330,20 @@ export default function SettingsPage() {
                 )}
               </div>
               <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} disabled={permissionDenied} aria-readonly={isSaving} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>PushAll Notifications</Label>
+                <p className="text-sm text-muted-foreground">
+                    Subscribe to our PushAll channel for more notification options.
+                </p>
+              </div>
+              <Button asChild variant="outline">
+                <a href="https://pushall.com/p/10182" target="_blank" rel="noopener noreferrer">
+                    <Bell className="mr-2 h-4 w-4" />
+                    Subscribe
+                </a>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -339,5 +357,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

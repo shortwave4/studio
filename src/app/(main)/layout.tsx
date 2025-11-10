@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -17,7 +18,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Flame } from "lucide-react";
+import { Flame, Bell } from "lucide-react";
+import Link from "next/link";
 
 export default function MainLayout({
   children,
@@ -77,6 +79,12 @@ export default function MainLayout({
               <div className="w-full flex-1">
                 {/* Can add breadcrumbs or search here */}
               </div>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="https://pushall.com/p/10182" target="_blank">
+                  <Bell />
+                  <span className="sr-only">Subscribe to PushAll</span>
+                </Link>
+              </Button>
               <ThemeToggle />
               <UserNav />
             </header>
