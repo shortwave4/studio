@@ -9,6 +9,7 @@ export type UserProfile = {
     bio?: string;
     coordinates?: GeoPoint | null;
     fcmTokens?: string[];
+    profilePictureUrl?: string;
 };
 
 export type AffiliateProduct = {
