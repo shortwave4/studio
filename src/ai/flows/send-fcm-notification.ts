@@ -53,8 +53,8 @@ const sendFcmTool = ai.defineTool(
 
         const { tokens, title, body, icon, image } = input;
 
-        if (tokens.length === 0) {
-            return { successCount: 0, failureCount: 0 };
+        if (!tokens || tokens.length === 0) {
+            throw new Error('No FCM tokens provided. Cannot send notification.');
         }
 
         const message: admin.messaging.MulticastMessage = {

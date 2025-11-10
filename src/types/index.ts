@@ -8,7 +8,7 @@ export type UserProfile = {
     email: string;
     bio?: string;
     coordinates?: GeoPoint | null;
-    fcmTokens?: string[];
+    fcmTokens: string[];
     profilePictureUrl?: string;
 };
 
