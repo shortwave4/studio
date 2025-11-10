@@ -122,7 +122,7 @@ export default function ProductsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
             <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group">
-              <CardHeader className="p-0 relative">
+              <CardHeader className="relative aspect-video">
                 {isAdmin && (
                     <div className="absolute top-2 right-2 z-10">
                         <DropdownMenu>
@@ -166,14 +166,12 @@ export default function ProductsPage() {
                         </DropdownMenu>
                     </div>
                 )}
-                <div className="aspect-video relative">
-                  <Image
-                    src={product.imageUrl}
-                    alt={product.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
+                <Image
+                  src={product.imageUrl}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                />
               </CardHeader>
               <CardContent className="p-6">
                 <CardTitle className="font-headline text-2xl mb-2">{product.name}</CardTitle>
