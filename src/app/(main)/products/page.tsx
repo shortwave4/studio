@@ -5,20 +5,24 @@ import { useState, useMemo } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink, PlusCircle, Search } from "lucide-react";
+import { ExternalLink, PlusCircle, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { useAdmin } from "@/hooks/use-admin";
 import { AddProductDialog } from "@/components/add-product-dialog";
-import { useCollection, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
-import { useFirestore } from "@/firebase/provider";
+import { useCollection, useMemoFirebase, useFirestore, deleteDocumentNonBlocking } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
 import type { AffiliateProduct } from "@/types";
 import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { EditProductDialog } from "@/components/edit-product-dialog";
 
 export default function ProductsPage() {
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
   const firestore = useFirestore();
   const productsCollection = useMemoFirebase(() => collection(firestore, 'affiliate_products'), [firestore]);
   const { data: products, isLoading: productsLoading } = useCollection<AffiliateProduct>(productsCollection);
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -42,6 +46,15 @@ export default function ProductsPage() {
       return matchesCategory && matchesSearch;
     });
   }, [products, searchTerm, selectedCategory]);
+  
+  const handleDeleteProduct = (productId: string, productName: string) => {
+    const productDocRef = doc(firestore, 'affiliate_products', productId);
+    deleteDocumentNonBlocking(productDocRef);
+    toast({
+        title: "Product Deleted",
+        description: `"${productName}" has been removed.`,
+    });
+  };
 
   return (
     <div className="container mx-auto">
@@ -108,8 +121,51 @@ export default function ProductsPage() {
        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardHeader className="p-0">
+            <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group">
+              <CardHeader className="p-0 relative">
+                {isAdmin && (
+                    <div className="absolute top-2 right-2 z-10">
+                        <EditProductDialog product={product}>
+                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="secondary" size="icon" className="h-8 w-8 bg-black/30 hover:bg-black/50 border-white/20 text-white">
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                     <DropdownMenuItem>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        <span>Edit</span>
+                                    </DropdownMenuItem>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                <Trash2 className="mr-2 h-4 w-4 text-destructive"/>
+                                                <span className="text-destructive">Delete</span>
+                                            </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the product "{product.name}".
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction 
+                                                    className="bg-destructive hover:bg-destructive/90"
+                                                    onClick={() => handleDeleteProduct(product.id, product.name)}>
+                                                    Delete
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </EditProductDialog>
+                    </div>
+                )}
                 <div className="aspect-video relative">
                   <Image
                     src={product.imageUrl}
