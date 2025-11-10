@@ -11,10 +11,13 @@ export type ChatContact = UserProfile & {
 export type Message = {
   id: string;
   senderId: string;
+  recipientId?: string;
   text: string;
   timestamp?: Timestamp | Date;
   own: boolean;
   status?: 'sending' | 'sent' | 'failed';
-  messageType: 'text' | 'image' | 'video' | 'file' | 'audio';
+  messageType: 'text' | 'image' | 'video' | 'file' | 'audio' | 'link';
   mediaUrl?: string | null;
 };
+
+    

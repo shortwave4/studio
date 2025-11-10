@@ -38,7 +38,6 @@ import {
   ArrowLeft,
   ImageIcon,
   Square,
-  CircleDotDashed,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -133,27 +132,39 @@ export default function ChatPage() {
   }, [messagesData, user?.uid]);
 
   const getLastMessage = (contactId: string): { text: string; time: string } => {
-    const relevantMessages = messagesData?.filter(msg => {
-        const chatParticipants = getChatId(msg.senderId, contactId);
-        const currentChatId = getChatId(user!.uid, contactId);
-        return chatParticipants === currentChatId;
-    });
-
-    if (!relevantMessages || relevantMessages.length === 0) {
+    if (!messagesData) {
         return { text: 'Click to start chatting!', time: '' };
     }
 
-    const lastMsg = relevantMessages[relevantMessages.length - 1];
-    
+    const currentChatId = getChatId(user!.uid, contactId);
+
+    // Filter messages for the specific chat, relying on the fact that chatId is unique
+    const relevantMessages = messagesData.filter(msg => {
+        const msgChatId = getChatId(msg.senderId, msg.recipientId || contactId);
+        // This logic might need adjustment based on how recipientId is stored for 1-on-1 chats.
+        // Assuming p2p chat messages might not have a recipientId, or it's the other user.
+        // Let's create a robust check.
+        const participants = [msg.senderId, msg.recipientId];
+        return (participants.includes(user!.uid) && participants.includes(contactId));
+    });
+
+    const lastMsg = relevantMessages.length > 0 ? relevantMessages[relevantMessages.length - 1] : null;
+
     if (lastMsg) {
       let text = 'Click to start chatting!';
       switch (lastMsg.messageType) {
         case 'image':
           text = 'Photo';
           break;
+        case 'video':
+          text = 'Video';
+          break;
         case 'audio':
           text = 'Audio message';
           break;
+        case 'link':
+            text = 'Link';
+            break;
         case 'text':
         default:
           text = lastMsg.text;
@@ -194,15 +205,20 @@ export default function ChatPage() {
     });
   };
 
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+
   const handleSendMessage = (e: FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
 
+    const isLink = urlRegex.test(newMessage.trim());
+
     addDocumentNonBlocking(messagesCollection, {
       text: newMessage,
       senderId: user.uid,
+      recipientId: selectedChat.id,
       timestamp: serverTimestamp(),
-      messageType: 'text',
+      messageType: isLink ? 'link' : 'text',
       mediaUrl: null,
     });
 
@@ -213,8 +229,8 @@ export default function ChatPage() {
     fileInputRef.current?.click();
   };
 
-  const uploadMedia = async (file: Blob, fileName: string, type: 'image' | 'audio') => {
-    if (!storage || !user || !messagesCollection || !chatId) {
+  const uploadMedia = async (file: Blob, fileName: string, type: 'image' | 'audio' | 'video') => {
+    if (!storage || !user || !messagesCollection || !chatId || !selectedChat) {
       return;
     }
     setIsUploading(true);
@@ -226,6 +242,7 @@ export default function ChatPage() {
       await addDocumentNonBlocking(messagesCollection, {
         text: '',
         senderId: user.uid,
+        recipientId: selectedChat.id,
         timestamp: serverTimestamp(),
         messageType: type,
         mediaUrl: downloadURL,
@@ -253,16 +270,24 @@ export default function ChatPage() {
     }
 
     const file = event.target.files[0];
-    if (!file.type.startsWith('image/')) {
+    let fileType: 'image' | 'video' | null = null;
+    
+    if (file.type.startsWith('image/')) {
+        fileType = 'image';
+    } else if (file.type.startsWith('video/')) {
+        fileType = 'video';
+    } else {
         toast({
             variant: "destructive",
             title: "Invalid File Type",
-            description: "Please select an image file."
+            description: "Please select an image or video file."
         });
         return;
     }
     
-    uploadMedia(file, file.name, 'image');
+    if (fileType) {
+        uploadMedia(file, file.name, fileType);
+    }
   };
 
   const handleStartRecording = async () => {
@@ -308,6 +333,34 @@ export default function ChatPage() {
     const date =
       timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  const renderMessageContent = (msg: Message) => {
+    switch (msg.messageType) {
+      case 'image':
+        return msg.mediaUrl ? (
+          <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
+            <Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/>
+          </a>
+        ) : null;
+      case 'video':
+        return msg.mediaUrl ? (
+            <video src={msg.mediaUrl} controls className="rounded-md max-w-xs" />
+        ) : null;
+      case 'audio':
+        return msg.mediaUrl ? (
+          <audio controls src={msg.mediaUrl} className="max-w-full h-10" />
+        ) : null;
+      case 'link':
+         return (
+          <a href={msg.text} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">
+            {msg.text}
+          </a>
+        );
+      case 'text':
+      default:
+        return <p>{msg.text}</p>;
+    }
   };
 
   const ChatList = (
@@ -422,22 +475,14 @@ export default function ChatPage() {
                 <div
                   className={cn(
                     'rounded-lg',
-                     msg.messageType !== 'audio' && 'p-3',
-                     msg.messageType === 'audio' && 'p-2',
+                     (msg.messageType !== 'audio' && msg.messageType !== 'video') && 'p-3',
+                     (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2',
                     msg.own
                       ? 'bg-primary text-primary-foreground rounded-br-none'
                       : 'bg-muted rounded-bl-none'
                   )}
                 >
-                   {msg.messageType === 'image' && msg.mediaUrl ? (
-                    <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
-                      <Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/>
-                    </a>
-                  ) : msg.messageType === 'audio' && msg.mediaUrl ? (
-                    <audio controls src={msg.mediaUrl} className="max-w-full h-10" />
-                  ) : (
-                    <p>{msg.text}</p>
-                  )}
+                   {renderMessageContent(msg)}
                 </div>
                 <p
                   className={cn(
@@ -480,7 +525,7 @@ export default function ChatPage() {
             disabled={!selectedChat || isUploading || isRecording}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
             <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading || isRecording}>
               <Paperclip className="w-5 h-5" />
             </Button>
