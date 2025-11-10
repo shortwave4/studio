@@ -1,35 +1,5 @@
 {
   "entities": {
-    "Announcement": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Announcement",
-      "type": "object",
-      "description": "Represents an in-app announcement sent by an admin.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the announcement."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the announcement."
-        },
-        "message": {
-          "type": "string",
-          "description": "The main content of the announcement."
-        },
-        "timestamp": {
-          "type": "string",
-          "description": "Timestamp of when the announcement was sent.",
-          "format": "date-time"
-        },
-        "adminId": {
-          "type": "string",
-          "description": "Reference to UserProfile. The ID of the admin who sent the announcement."
-        }
-      },
-      "required": ["id", "title", "message", "timestamp", "adminId"]
-    },
     "UserProfile": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
@@ -390,20 +360,6 @@
               "description": "The unique identifier of the admin user."
             }
           ]
-        }
-      },
-      {
-        "path": "/announcements/{announcementId}",
-        "definition": {
-            "entityName": "Announcement",
-            "schema": {
-                "$ref": "#/backend/entities/Announcement"
-            },
-            "description": "Stores in-app announcements sent by an admin. Everyone can read, only admins can write.",
-            "params": [{
-                "name": "announcementId",
-                "description": "The unique identifier of the announcement."
-            }]
         }
       }
     ],
