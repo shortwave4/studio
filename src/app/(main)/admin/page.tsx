@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,11 +30,18 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
+  const { data: usersData, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
   const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    if (usersData) {
+      setUsers(usersData);
+    }
+  }, [usersData]);
 
   const isLoading = isAdminLoading || usersLoading;
 
