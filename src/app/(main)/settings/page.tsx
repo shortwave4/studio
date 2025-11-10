@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
@@ -46,7 +47,9 @@ export default function SettingsPage() {
     }
     // Check initial notification permission status
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPushEnabled(Notification.permission === 'granted');
+      const currentPermission = Notification.permission;
+      setPushEnabled(currentPermission === 'granted');
+      setPermissionDenied(currentPermission === 'denied');
     }
   }, [user]);
 
@@ -130,12 +133,14 @@ export default function SettingsPage() {
       const token = await requestPermission(firestore, user.uid);
       if (token) {
         setPushEnabled(true);
+        setPermissionDenied(false);
         toast({
           title: "Notifications Enabled",
           description: "You will now receive push notifications for direct messages.",
         });
       } else {
         setPushEnabled(false);
+        setPermissionDenied(Notification.permission === 'denied');
         toast({
           variant: "destructive",
           title: "Permission Denied",
@@ -143,6 +148,8 @@ export default function SettingsPage() {
         });
       }
     } else {
+      // This part is for explicitly disabling notifications if we build that feature.
+      // For now, the user manages this via browser settings.
       setPushEnabled(false);
       console.log("Push notifications disabled by user toggle.");
     }
@@ -312,8 +319,13 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">
                   Receive notifications for chats and direct messages.
                 </p>
+                 {permissionDenied && (
+                  <p className="text-xs text-destructive mt-1">
+                    Notifications are blocked. Please enable them in your browser settings.
+                  </p>
+                )}
               </div>
-              <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} aria-readonly={isSaving} />
+              <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} disabled={permissionDenied} aria-readonly={isSaving} />
             </div>
              <div className="flex items-center justify-between">
               <div>
