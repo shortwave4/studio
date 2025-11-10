@@ -2,11 +2,12 @@
 "use client";
 
 import Link from "next/link";
+import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { doc, GeoPoint, getDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -96,28 +97,34 @@ export default function SignupPage() {
     router.push('/');
   }
 
-  const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      const result: UserCredential = await signInWithPopup(auth, provider);
-      const user = result.user;
+   React.useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result) {
+          const user = result.user;
+          const userDocRef = doc(firestore, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
 
-      const userDocRef = doc(firestore, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (!userDoc.exists()) {
-         handlePostSignup(user, user.displayName || "Google User", user.email || "", user.phoneNumber || "");
-      } else {
-         router.push('/');
-      }
-    } catch (error: any) {
-      console.error("Google Sign-In Error:", error);
-       toast({
+          if (!userDoc.exists()) {
+            handlePostSignup(user, user.displayName || "Google User", user.email || "", user.phoneNumber || "");
+          } else {
+            router.push('/');
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Google Redirect Sign-In Error:", error);
+        toast({
           variant: "destructive",
           title: "Signup Failed",
           description: "Could not sign in with Google. Please try again.",
+        });
       });
-    }
+  }, [auth, firestore, router, toast]);
+
+  const handleGoogleSignIn = () => {
+    const provider = new GoogleAuthProvider();
+    signInWithRedirect(auth, provider);
   };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {

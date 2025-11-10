@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { GoogleAuthProvider, signInWithPopup, UserCredential } from "firebase/auth";
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, UserCredential } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -49,31 +50,36 @@ export default function LoginPage() {
     },
   });
 
-  const handleGoogleSignIn = async () => {
+  React.useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result && result.user) {
+          const user = result.user;
+          const userDocRef = doc(firestore, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (!userDoc.exists()) {
+            const userProfile = {
+              id: user.uid,
+              name: user.displayName || "Google User",
+              email: user.email || "",
+              profilePictureUrl: user.photoURL || "",
+              phoneNumber: user.phoneNumber || "",
+            };
+            setDocumentNonBlocking(userDocRef, userProfile, { merge: true });
+          }
+          router.push("/");
+        }
+      })
+      .catch((error) => {
+        console.error("Google Redirect Sign-In Error:", error);
+      });
+  }, [auth, firestore, router]);
+
+
+  const handleGoogleSignIn = () => {
     const provider = new GoogleAuthProvider();
-    try {
-      const result: UserCredential = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Check if user already exists in Firestore
-      const userDocRef = doc(firestore, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      // If user doesn't exist, create a new profile
-      if (!userDoc.exists()) {
-        const userProfile = {
-          id: user.uid,
-          name: user.displayName || "Google User",
-          email: user.email || "",
-          profilePictureUrl: user.photoURL || "",
-          phoneNumber: user.phoneNumber || "",
-        };
-        setDocumentNonBlocking(userDocRef, userProfile, { merge: true });
-      }
-      router.push("/");
-    } catch (error) {
-      console.error("Google Sign-In Error:", error);
-    }
+    signInWithRedirect(auth, provider);
   };
 
   function onSubmit(values: z.infer<typeof formSchema>) {
