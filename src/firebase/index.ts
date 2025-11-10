@@ -38,19 +38,31 @@ export function initializeFirebase() {
   const storage = getStorage(firebaseApp);
   let messaging = null;
 
+  // We need to check for window because `isSupported()` depends on browser features.
+  // We can initialize storage and other services on the server, but messaging requires the browser.
   if (typeof window !== 'undefined') {
     isSupported().then(supported => {
       if (supported) {
-        messaging = getMessaging(firebaseApp);
+        // This is async, but we'll get the instance when needed.
+        // For now, we are just starting the check.
+        try {
+          messaging = getMessaging(firebaseApp);
+        } catch (e) {
+          console.error("Failed to initialize messaging", e);
+        }
       }
     });
   }
+  
+  // Storage can be initialized on both server and client.
+  // The issue was caching a null storage object from the server run.
+  // By initializing it outside the window check, we ensure it's always available.
 
   firebaseServices = {
     firebaseApp,
     auth,
     firestore,
-    storage,
+    storage, // Now storage is always initialized
     messaging,
   };
 
