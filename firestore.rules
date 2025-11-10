@@ -15,7 +15,8 @@ service cloud.firestore {
       // Any authenticated user can read (list and get) status updates.
       // Only the owner can write (create, update, delete) their own status updates.
       match /status_updates/{statusId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
       }
     }
 
