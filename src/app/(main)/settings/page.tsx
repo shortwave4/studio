@@ -127,11 +127,10 @@ export default function SettingsPage() {
 
 
   const handlePushToggle = async (checked: boolean) => {
-    if (!user) return;
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-        return;
+    if (!user || typeof window === 'undefined' || !('Notification' in window)) {
+      return;
     }
-
+  
     if (checked) {
       const token = await requestPermission(firestore, user.uid);
       if (token) {
@@ -139,22 +138,25 @@ export default function SettingsPage() {
         setPermissionDenied(false);
         toast({
           title: "Notifications Enabled",
-          description: "You will now receive push notifications for direct messages.",
+          description: "You will now receive push notifications.",
         });
       } else {
-        setPushEnabled(false);
-        setPermissionDenied(Notification.permission === 'denied');
-        toast({
-          variant: "destructive",
-          title: "Permission Denied",
-          description: "You need to grant permission in your browser settings to enable notifications.",
-        });
+        // Don't setPushEnabled(false) here, as it causes the switch to feel "stuck"
+        // The permission state will be updated by the effect hook anyway.
+        const currentPermission = Notification.permission;
+        setPermissionDenied(currentPermission === 'denied');
+        if (currentPermission === 'denied') {
+            toast({
+              variant: "destructive",
+              title: "Permission Denied",
+              description: "You need to grant permission in your browser settings to enable notifications.",
+            });
+        }
       }
     } else {
-      // This part is for explicitly disabling notifications if we build that feature.
-      // For now, the user manages this via browser settings.
+      // Logic for disabling notifications can be added here if needed in the future.
+      // For now, users disable it through browser settings, which this component reflects.
       setPushEnabled(false);
-      console.log("Push notifications disabled by user toggle.");
     }
   };
   
@@ -366,4 +368,3 @@ export default function SettingsPage() {
   );
 }
 
-    
