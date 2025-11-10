@@ -121,8 +121,8 @@ export default function ProductsPage() {
        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group bg-card text-card-foreground">
-              <CardHeader className="relative aspect-video">
+            <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group glass">
+              <CardHeader className="relative aspect-video p-0">
                 {isAdmin && (
                     <div className="absolute top-2 right-2 z-10">
                         <DropdownMenu>

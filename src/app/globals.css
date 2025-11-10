@@ -105,10 +105,10 @@
 
 @layer components {
   .glass {
-    @apply bg-card/20 backdrop-blur-md border-white/5;
+    @apply bg-card/20 border-white/5;
   }
 
   .dark .glass {
-    @apply bg-card/10 backdrop-blur-md border-white/5;
+    @apply bg-card/10 border-white/5;
   }
 }
