@@ -30,7 +30,6 @@ import { Input } from "@/components/ui/input";
 import { useAuth, useFirestore, setDocumentNonBlocking, requestPermission } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -185,8 +184,8 @@ export default function SignupPage() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
         </Form>
@@ -200,5 +199,3 @@ export default function SignupPage() {
     </Card>
   );
 }
-
-    
