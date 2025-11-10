@@ -12,12 +12,15 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId;
 
       // Rules for status_updates sub-collection
-      // Allow any authenticated user to read (get, list) status updates.
       match /status_updates/{statusId} {
-        allow read: if request.auth != null;
-        // Allow a user to only write to their own status updates.
+        // Any authenticated user can read individual status updates.
+        allow get: if request.auth != null;
+        // A user can only write to their own status updates.
         allow write: if request.auth.uid == userId;
       }
+      
+      // Allow any authenticated user to list status updates for any user.
+      allow list on /databases/$(database)/documents/users/$(userId)/status_updates: if request.auth != null;
     }
 
     // Rules for private chats
