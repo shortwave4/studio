@@ -14,13 +14,14 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing } from 'lucide-react';
+import { Shield, Send, BellRing, Info } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AdminPage() {
   const { user } = useUser();
@@ -99,7 +100,7 @@ export default function AdminPage() {
 
 
   return (
-    <div className="container mx-auto max-w-4xl">
+    <div className="container mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-headline tracking-tight">
           Admin Controls
@@ -132,6 +133,14 @@ export default function AdminPage() {
 
         {isAdmin && (
           <>
+             <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>How FCM Tokens Work</AlertTitle>
+              <AlertDescription>
+                FCM tokens will only appear for users after they have gone to the <strong>Settings</strong> page and enabled Push Notifications.
+              </AlertDescription>
+            </Alert>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -173,6 +182,7 @@ export default function AdminPage() {
                 {isLoading ? (
                   <p className="text-muted-foreground">Loading user data...</p>
                 ) : (
+                 <div className="w-full overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -190,7 +200,7 @@ export default function AdminPage() {
                             {u.fcmTokens && u.fcmTokens.length > 0 ? (
                               <div className="flex flex-col gap-1">
                                 {u.fcmTokens.map((token, i) => (
-                                  <Badge key={i} variant="secondary" className="truncate font-mono text-xs">
+                                  <Badge key={i} variant="secondary" className="font-mono text-xs max-w-xs truncate">
                                     {token}
                                   </Badge>
                                 ))}
@@ -203,6 +213,7 @@ export default function AdminPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
