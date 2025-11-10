@@ -22,11 +22,10 @@ service cloud.firestore {
 
     // Rules for private chats
     match /chats/{chatId} {
-      // A user can access a chat and its messages if they are a member.
-      allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
-      
+      // Allow a user to get the chat document if they are a member.
+      allow get: if request.auth != null && request.auth.uid in chatId.split('_');
+
       // Rules for messages within a private chat
-      // This inherits the rule from the parent chat document.
       // A user can read or write messages if they are part of the chat.
       match /messages/{messageId} {
         allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
