@@ -125,45 +125,45 @@ export default function ProductsPage() {
               <CardHeader className="p-0 relative">
                 {isAdmin && (
                     <div className="absolute top-2 right-2 z-10">
-                        <EditProductDialog product={product}>
-                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="secondary" size="icon" className="h-8 w-8 bg-black/30 hover:bg-black/50 border-white/20 text-white">
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                     <DropdownMenuItem>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="secondary" size="icon" className="h-8 w-8 bg-black/30 hover:bg-black/50 border-white/20 text-white">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <EditProductDialog product={product}>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                         <Edit className="mr-2 h-4 w-4" />
                                         <span>Edit</span>
                                     </DropdownMenuItem>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                                <Trash2 className="mr-2 h-4 w-4 text-destructive"/>
-                                                <span className="text-destructive">Delete</span>
-                                            </DropdownMenuItem>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    This action cannot be undone. This will permanently delete the product "{product.name}".
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction 
-                                                    className="bg-destructive hover:bg-destructive/90"
-                                                    onClick={() => handleDeleteProduct(product.id, product.name)}>
-                                                    Delete
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </EditProductDialog>
+                                </EditProductDialog>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                            <Trash2 className="mr-2 h-4 w-4 text-destructive"/>
+                                            <span className="text-destructive">Delete</span>
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action cannot be undone. This will permanently delete the product "{product.name}".
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction 
+                                                className="bg-destructive hover:bg-destructive/90"
+                                                onClick={() => handleDeleteProduct(product.id, product.name)}>
+                                                Delete
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 )}
                 <div className="aspect-video relative">
