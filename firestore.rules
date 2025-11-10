@@ -8,7 +8,7 @@
  *
  * Data Structure:
  * - /users/{userId}: User profile information. Only the user can read/write their own profile.
- * - /users/{userId}/chats/{chatId}/messages/{messageId}: Chat messages between two users.  Read/write access is based on sender/recipient IDs.
+ * - /chats/{chatId}/messages/{messageId}: Chat messages between two users. Read/write access is based on sender/recipient IDs.
  * - /groups/{groupId}: Group chat metadata, including a 'members' map (userId: role).
  * - /groups/{groupId}/messages/{messageId}: Group chat messages, with a denormalized 'members' map for authorization.
  * - /status_updates/{statusUpdateId}: User status updates, owned by the user.
@@ -47,27 +47,31 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
+
+      /**
+       * @description Secures status updates for a user. Only the user can manage their own statuses.
+       * @path /users/{userId}/status_updates/{statusId}
+       */
+      match /status_updates/{statusId} {
+        allow read: if request.auth != null;
+        allow write: if isOwner();
+      }
     }
 
     /**
-     * @description Secures chat messages between users in a private chat.
-     * @path /users/{userId}/chats/{chatId}/messages/{messageId}
-     * @allow (create) User 'user123' can create a message if they are the sender or recipient.
-     * @allow (get, list) User 'user123' can read messages if they are the chat owner.
-     * @deny (create) User 'user456' cannot create a message in 'user123's chat if they are not a participant.
-     * @deny (update, delete) No one can update or delete a message once it's sent.
-     * @principle Enforces that only participants can create messages; messages are immutable.
+     * @description Secures one-on-one chat messages.
+     * @path /chats/{chatId}/messages/{messageId}
+     * @allow (get, list, create) A user can read or write messages in a chat if their UID is part of the chatId.
+     * @deny (update, delete) Messages are immutable.
      */
-    match /users/{userId}/chats/{chatId}/messages/{messageId} {
-      function canCreateMessage() {
-        return request.auth != null && (request.resource.data.senderId == request.auth.uid || request.resource.data.recipientId == request.auth.uid);
+    match /chats/{chatId}/messages/{messageId} {
+      function isChatParticipant() {
+        return request.auth != null && request.auth.uid in chatId.split('_');
       }
-      allow get: if request.auth.uid == userId;
-      allow list: if request.auth.uid == userId;
-      allow create: if request.auth != null && canCreateMessage();
-      allow update: if false;
-      allow delete: if false;
+      allow read, create: if isChatParticipant();
+      allow update, delete: if false;
     }
+
 
     /**
      * @description Secures chat groups. Access is managed through the 'members' map.
@@ -118,28 +122,6 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures status updates. Only the user can read, create, update or delete their own status.
-     * @path /status_updates/{statusUpdateId}
-     * @allow (create) User 'user123' can create a status update.
-     * @allow (get, list) Any authenticated user can read status updates.
-     * @allow (update, delete) Only the owner of the status update can update or delete it.
-     * @principle Enforces document ownership, restricting access to the owner of the status update.
-     */
-    match /status_updates/{statusUpdateId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner() {
-        return request.auth != null && resource.data.userId == request.auth.uid;
-      }
-      allow get: if true;
-      allow list: if isSignedIn();
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if isOwner();
-      allow delete: if isOwner();
-    }
-
-    /**
      * @description Secures affiliate products. Only admins can create, update, or delete products.
      * @path /affiliate_products/{productId}
      * @allow (get, list) Any authenticated user can read the affiliate products.
@@ -148,13 +130,10 @@ service cloud.firestore {
      */
     match /affiliate_products/{productId} {
       function isAdmin() {
-          return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+          return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
       }
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
     }
 
      /**
@@ -174,3 +153,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
