@@ -45,7 +45,7 @@ export default function SettingsPage() {
       // For now, we'll use a placeholder.
       setBio("Loves hiking and photography.");
     }
-    // Check initial notification permission status
+    // Check initial notification permission status only on client
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const currentPermission = Notification.permission;
       setPushEnabled(currentPermission === 'granted');
@@ -128,6 +128,9 @@ export default function SettingsPage() {
 
   const handlePushToggle = async (checked: boolean) => {
     if (!user) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+        return;
+    }
 
     if (checked) {
       const token = await requestPermission(firestore, user.uid);
@@ -362,3 +365,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
