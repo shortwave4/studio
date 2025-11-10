@@ -15,8 +15,7 @@ service cloud.firestore {
       // Any authenticated user can read (list and get) status updates.
       // Only the owner can write (create, update, delete) their own status updates.
       match /status_updates/{statusId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth.uid == userId;
+        allow read, write: if request.auth != null;
       }
     }
 
@@ -24,8 +23,6 @@ service cloud.firestore {
     match /chats/{chatId} {
       // A user can get info about the chat if they are a member.
       allow get: if request.auth != null && request.auth.uid in chatId.split('_');
-      // A user can list/read/write messages if they are part of the chat.
-      allow list, read, write: if request.auth != null && request.auth.uid in chatId.split('_');
       
       // Rules for messages within a private chat
       // Only the two users involved in the chat can read or write messages.
