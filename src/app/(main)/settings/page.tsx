@@ -127,26 +127,27 @@ export default function SettingsPage() {
     if (!user) return;
 
     if (checked) {
+      // Temporarily set the switch to on, assuming the user will grant permission.
+      setPushEnabled(true);
       const token = await requestPermission(firestore, user.uid);
       if (token) {
-        setPushEnabled(true);
         toast({
           title: "Notifications Enabled",
           description: "You will now receive push notifications for direct messages.",
         });
       } else {
-         // The user denied permission, so we switch it back off.
+         // If permission is denied, turn the switch back off and show a toast.
         setPushEnabled(false);
-         toast({
+        toast({
           variant: "destructive",
           title: "Permission Denied",
           description: "You need to grant permission to enable notifications.",
         });
       }
     } else {
-      // In a real app, you would have logic here to revoke the token on your server.
-      // For now, we'll just update the UI.
+      // This part handles turning off notifications.
       setPushEnabled(false);
+      // In a real app, you would have logic here to revoke the token on your server.
       console.log("Push notifications disabled by user toggle.");
       // We don't show a toast here to avoid being too noisy.
     }
@@ -354,5 +355,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
