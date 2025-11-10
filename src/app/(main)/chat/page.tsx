@@ -6,6 +6,8 @@ import {
   serverTimestamp,
   Timestamp,
   collection,
+  deleteDoc,
+  doc,
 } from 'firebase/firestore';
 import {
   ref,
@@ -28,6 +30,7 @@ import {
   useStorage,
   useCollection,
   useMemoFirebase,
+  deleteDocumentNonBlocking,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -38,6 +41,7 @@ import {
   ArrowLeft,
   ImageIcon,
   Square,
+  Trash2,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -68,6 +72,7 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
@@ -107,6 +112,14 @@ export default function ChatPage() {
     }
   }, [user?.uid, toast, allUsers, allUsersLoading]);
 
+    const filteredContacts = useMemo(() => {
+    if (!contacts) return [];
+    return contacts.filter(contact =>
+      contact.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [contacts, searchTerm]);
+
+
   const chatId = useMemo(() => {
     if (!user || !selectedChat) return null;
     return getChatId(user.uid, selectedChat.id);
@@ -138,14 +151,9 @@ export default function ChatPage() {
 
     const currentChatId = getChatId(user!.uid, contactId);
 
-    // Filter messages for the specific chat, relying on the fact that chatId is unique
-    const relevantMessages = messagesData.filter(msg => {
+    const relevantMessages = messages.filter(msg => {
         const msgChatId = getChatId(msg.senderId, msg.recipientId || contactId);
-        // This logic might need adjustment based on how recipientId is stored for 1-on-1 chats.
-        // Assuming p2p chat messages might not have a recipientId, or it's the other user.
-        // Let's create a robust check.
-        const participants = [msg.senderId, msg.recipientId];
-        return (participants.includes(user!.uid) && participants.includes(contactId));
+        return msgChatId === currentChatId;
     });
 
     const lastMsg = relevantMessages.length > 0 ? relevantMessages[relevantMessages.length - 1] : null;
@@ -335,6 +343,13 @@ export default function ChatPage() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
+    const handleDeleteMessage = (messageId: string) => {
+    if (!chatId) return;
+    const messageRef = doc(firestore, 'chats', chatId, 'messages', messageId);
+    deleteDocumentNonBlocking(messageRef);
+  };
+
+
   const renderMessageContent = (msg: Message) => {
     switch (msg.messageType) {
       case 'image':
@@ -369,7 +384,12 @@ export default function ChatPage() {
         <h1 className="text-2xl font-bold font-headline">Chats</h1>
         <div className="relative mt-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search chats..." className="pl-10" />
+          <Input 
+            placeholder="Search chats..." 
+            className="pl-10" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
       <Separator />
@@ -387,7 +407,7 @@ export default function ChatPage() {
             ))}
           </div>
         ) : (
-          contacts?.map((contact) => {
+          filteredContacts?.map((contact) => {
              const lastMessageInfo = getLastMessage(contact.id);
             return (
               <div
@@ -463,7 +483,7 @@ export default function ChatPage() {
             <div
               key={msg.id || index}
               className={cn(
-                'flex max-w-[75%] gap-2',
+                'flex max-w-[75%] gap-2 group',
                 msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto',
               )}
             >
@@ -471,7 +491,7 @@ export default function ChatPage() {
                 <AvatarImage src={avatarSrc} />
                 <AvatarFallback>{avatarFallback}</AvatarFallback>
               </Avatar>
-              <div className="flex flex-col">
+              <div className="flex items-end gap-2">
                 <div
                   className={cn(
                     'rounded-lg',
@@ -484,14 +504,16 @@ export default function ChatPage() {
                 >
                    {renderMessageContent(msg)}
                 </div>
-                <p
-                  className={cn(
-                    'text-xs text-muted-foreground mt-1',
-                    msg.own ? 'text-right' : 'text-left'
+                 {msg.own && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleDeleteMessage(msg.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
-                >
-                   {getTimeString(msg.timestamp)}
-                </p>
               </div>
             </div>
           )})}

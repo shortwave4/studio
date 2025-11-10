@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Firestore Security Rules for ConnectSphere
  *
@@ -43,7 +44,7 @@ service cloud.firestore {
         return request.auth != null && request.auth.uid == userId;
       }
       allow get: if isOwner();
-      allow list: if true; // Allowing listing all users.
+      allow list: if request.auth != null; 
       allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
@@ -61,15 +62,20 @@ service cloud.firestore {
     /**
      * @description Secures one-on-one chat messages.
      * @path /chats/{chatId}/messages/{messageId}
-     * @allow (get, list, create) A user can read or write messages in a chat if their UID is part of the chatId.
-     * @deny (update, delete) Messages are immutable.
+     * @allow (read, create) A user can read or write messages in a chat if their UID is part of the chatId.
+     * @allow (delete) A user can delete their own messages.
+     * @deny (update) Messages are immutable.
      */
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
         return request.auth != null && request.auth.uid in chatId.split('_');
       }
+      function isSender() {
+        return request.auth != null && request.auth.uid == resource.data.senderId;
+      }
       allow read, create: if isChatParticipant();
-      allow update, delete: if false;
+      allow delete: if isSender();
+      allow update: if false;
     }
 
 

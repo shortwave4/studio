@@ -18,12 +18,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 
-export default function DiscoverUsers() {
+interface DiscoverUsersProps {
+  searchTerm: string;
+}
+
+export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   const router = useRouter();
   const { user } = useUser();
   const { toast } = useToast();
   const firestore = useFirestore();
-  const [suggestedUsers, setSuggestedUsers] = React.useState<UserProfile[]>([]);
+  const [allSuggestedUsers, setAllSuggestedUsers] = React.useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
@@ -36,7 +40,7 @@ export default function DiscoverUsers() {
 
       try {
         if (!usersCollection) {
-          setSuggestedUsers([]);
+          setAllSuggestedUsers([]);
           return;
         }
 
@@ -54,10 +58,10 @@ export default function DiscoverUsers() {
               users: plainUsers,
             });
             const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
-            setSuggestedUsers(filteredUsers);
+            setAllSuggestedUsers(filteredUsers);
         } else {
              const filteredUsers = validUsers.filter((u) => u.id !== user?.uid);
-             setSuggestedUsers(filteredUsers);
+             setAllSuggestedUsers(filteredUsers);
         }
       } catch (error) {
         console.error("Failed to fetch or sort users:", error);
@@ -102,6 +106,10 @@ export default function DiscoverUsers() {
     }
   }, [user?.uid, firestore, toast, user, usersCollection, usersCollectionLoading]);
 
+  const filteredUsers = React.useMemo(() => {
+    return allSuggestedUsers.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [allSuggestedUsers, searchTerm]);
+
 
   const handleStartChat = () => {
     router.push('/chat');
@@ -136,7 +144,7 @@ export default function DiscoverUsers() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
-      {suggestedUsers.map((userProfile) => (
+      {filteredUsers.map((userProfile) => (
         <Card
           key={userProfile.id}
           className="text-center shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-xl overflow-hidden bg-card"
@@ -168,3 +176,5 @@ export default function DiscoverUsers() {
     </div>
   );
 }
+
+    

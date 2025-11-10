@@ -53,9 +53,17 @@ const nextConfig: NextConfig = {
         hostname: 'images-amazon.com',
         port: '',
         pathname: '/**',
+      },
+       {
+        protocol: 'https',
+        hostname: 'm.media-amazon.com',
+        port: '',
+        pathname: '/**',
       }
     ],
   },
 };
 
 export default withSerwist(nextConfig);
+
+    
