@@ -6,16 +6,16 @@ import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { PlusCircle, X, ImagePlus } from "lucide-react";
+import { PlusCircle, X, ImagePlus, Send, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, useStorage } from "@/firebase";
 import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { UserProfile } from "@/types";
+import { Card } from "@/components/ui/card";
 
 type StatusStory = {
   id: string;
@@ -44,8 +44,13 @@ export default function StatusPage() {
   const timerRef = useRef<NodeJS.Timeout>();
   const progressTimerRef = useRef<NodeJS.Timeout>();
   const [isStoryLoading, setIsStoryLoading] = useState(true);
-  const [isAddStatusOpen, setIsAddStatusOpen] = useState(false);
   
+  const [isAddingStatus, setIsAddingStatus] = useState(false);
+  const [statusFile, setStatusFile] = useState<File | null>(null);
+  const [statusPreview, setStatusPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: usersData, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
@@ -104,12 +109,6 @@ export default function StatusPage() {
     setStatusesLoading(false);
 
   }, [allStatuses, usersData, rawStatusesLoading, usersLoading]);
-
-  const fetchStatuses = useCallback(async () => {
-    // This function is kept for the AddStatusDialog to call for a refresh.
-    // The main loading is now handled by the useCollection hook and useEffect.
-  }, []);
-
 
   const handleSelectUser = useCallback((user: StatusUser) => {
     setActiveUser(user);
@@ -198,35 +197,29 @@ export default function StatusPage() {
            closeStatus();
          }
        } else {
-         // This is the first user, so just reset the current story
          setActiveStoryIndex(0);
          setProgress(0);
          startTimer();
        }
     }
   };
-
-
-  const AddStatusDialog = () => {
-    const [file, setFile] = useState<File | null>(null);
-    const [preview, setPreview] = useState<string | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
-
+  
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
-            setFile(selectedFile);
-            setPreview(URL.createObjectURL(selectedFile));
+            setStatusFile(selectedFile);
+            setStatusPreview(URL.createObjectURL(selectedFile));
+            setIsAddingStatus(true);
         }
     };
 
     const handleUpload = async () => {
-        if (!file || !user || !storage) return;
+        if (!statusFile || !user || !storage) return;
 
         setIsUploading(true);
         try {
-            const storageRef = ref(storage, `status_updates/${user.uid}/${Date.now()}_${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
+            const storageRef = ref(storage, `status_updates/${user.uid}/${Date.now()}_${statusFile.name}`);
+            const snapshot = await uploadBytes(storageRef, statusFile);
             const downloadURL = await getDownloadURL(snapshot.ref);
             
             const statusCollectionRef = collection(firestore, 'status_updates');
@@ -234,12 +227,11 @@ export default function StatusPage() {
                 mediaUrl: downloadURL,
                 timestamp: serverTimestamp(),
                 userId: user.uid,
-                type: 'image', // Assuming only image for now
+                type: 'image', 
             });
             
             toast({ title: "Status Added!", description: "Your new status is now live." });
-            setIsAddStatusOpen(false);
-            // No need to call fetchStatuses, useCollection will update automatically
+            handleCancelAddStatus();
         } catch (error) {
             console.error("Status upload failed:", error);
             toast({ variant: "destructive", title: "Upload Failed", description: "Could not add your status." });
@@ -248,32 +240,14 @@ export default function StatusPage() {
         }
     };
 
-    return (
-      <Dialog open={isAddStatusOpen} onOpenChange={setIsAddStatusOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Status</DialogTitle>
-            <DialogDescription>Upload an image to share with your friends for the next 24 hours.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Input type="file" accept="image/*" onChange={handleFileChange} />
-            {preview && (
-              <div className="relative aspect-[9/16] w-full rounded-md overflow-hidden">
-                <Image src={preview} alt="Status preview" fill className="object-cover"/>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddStatusOpen(false)} disabled={isUploading}>Cancel</Button>
-            <Button onClick={handleUpload} disabled={!file || isUploading}>
-              {isUploading ? "Uploading..." : "Post Status"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    )
-  }
-
+    const handleCancelAddStatus = () => {
+        setIsAddingStatus(false);
+        setStatusFile(null);
+        setStatusPreview(null);
+        if(fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    }
 
   if (activeUser) {
       const activeStory = activeUser.stories[activeStoryIndex];
@@ -314,7 +288,6 @@ export default function StatusPage() {
                     </Button>
                 </div>
 
-                {/* Navigation overlays */}
                  <div className="absolute left-0 top-0 h-full w-1/3 z-10" onMouseDown={handlePrevStory} onTouchEnd={handlePrevStory}/>
                  <div className="absolute right-0 top-0 h-full w-1/3 z-10" onMouseDown={handleNextStory} onTouchEnd={handleNextStory}/>
             </div>
@@ -324,13 +297,37 @@ export default function StatusPage() {
 
   return (
     <div className="container mx-auto py-6">
+       <Input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold font-headline">Status</h1>
-        <Button size="sm" onClick={() => setIsAddStatusOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Status
-        </Button>
+        {!isAddingStatus && (
+            <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Status
+            </Button>
+        )}
       </div>
-      <AddStatusDialog />
+
+    {isAddingStatus && statusPreview && (
+        <Card className="mb-6">
+            <div className="p-4 space-y-4">
+                <div className="relative aspect-[16/9] w-full rounded-md overflow-hidden">
+                    <Image src={statusPreview} alt="Status preview" fill className="object-cover"/>
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={handleCancelAddStatus} disabled={isUploading}>
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Cancel
+                    </Button>
+                    <Button onClick={handleUpload} disabled={!statusFile || isUploading}>
+                         <Send className="mr-2 h-4 w-4" />
+                        {isUploading ? "Uploading..." : "Post Status"}
+                    </Button>
+                </div>
+            </div>
+        </Card>
+    )}
+
+
       {(statusesLoading) ? (
          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -344,7 +341,7 @@ export default function StatusPage() {
               </div>
             ))}
         </div>
-      ) : statuses.length === 0 ? (
+      ) : statuses.length === 0 && !isAddingStatus ? (
         <div className="flex flex-col items-center justify-center text-center py-20 bg-card/50 rounded-lg">
           <ImagePlus className="w-16 h-16 text-muted-foreground mb-4"/>
           <h2 className="text-xl font-bold">No Status Updates</h2>
@@ -381,4 +378,4 @@ export default function StatusPage() {
   );
 }
 
-
+    
