@@ -148,18 +148,24 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        const path: string = (finalQuery as unknown as InternalQuery)._query.path.canonicalString()
-        const contextualError = new FirestorePermissionError({
-          operation: 'list',
-          path,
-        });
-        
-        setError(contextualError); // Set local state for UI feedback if needed
-        setData(null);
-        setIsLoading(false);
+        if (error.code === 'permission-denied') {
+            const path: string = (finalQuery as unknown as InternalQuery)._query.path.canonicalString()
+            const contextualError = new FirestorePermissionError({
+            operation: 'list',
+            path,
+            });
+            
+            setError(contextualError); // Set local state for UI feedback if needed
+            setData(null);
+            setIsLoading(false);
 
-        // Emit the rich error for global handling (e.g., development overlay)
-        errorEmitter.emit('permission-error', contextualError);
+            // Emit the rich error for global handling (e.g., development overlay)
+            errorEmitter.emit('permission-error', contextualError);
+        } else {
+             setError(error);
+             setData(null);
+             setIsLoading(false);
+        }
       }
     );
 
