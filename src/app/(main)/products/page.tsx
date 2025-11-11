@@ -103,11 +103,11 @@ export default function ProductsPage() {
        {isLoading ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden shadow-lg">
+                <Card key={i} className="overflow-hidden shadow-lg flex flex-col">
                     <CardHeader className="p-0">
-                        <div className="aspect-video relative bg-muted animate-pulse" />
+                        <div className="aspect-[4/3] relative bg-muted animate-pulse" />
                     </CardHeader>
-                    <CardContent className="p-6 space-y-2">
+                    <CardContent className="p-6 space-y-2 flex-grow">
                         <div className="h-6 w-3/4 rounded bg-muted animate-pulse" />
                         <div className="h-4 w-full rounded bg-muted animate-pulse" />
                         <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
@@ -121,8 +121,8 @@ export default function ProductsPage() {
        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group glass">
-              <CardHeader className="relative aspect-video p-0">
+            <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group glass flex flex-col">
+              <CardHeader className="relative aspect-[4/3] p-0">
                 {isAdmin && (
                     <div className="absolute top-2 right-2 z-10">
                         <DropdownMenu>
@@ -173,7 +173,7 @@ export default function ProductsPage() {
                   className="object-cover"
                 />
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-6 flex-grow">
                 <CardTitle className="font-headline text-2xl mb-2">{product.name}</CardTitle>
                 <CardDescription>
                   {product.description}
@@ -200,3 +200,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
