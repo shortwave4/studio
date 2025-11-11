@@ -53,15 +53,20 @@ service cloud.firestore {
     /**
      * @description Secures status updates. Any authenticated user can read statuses.
      * Users can only create status updates for themselves.
+     * Users can only delete their own status updates.
      * @path /status_updates/{statusId}
      */
     match /status_updates/{statusId} {
         function isOwner() {
-          return request.auth != null && request.auth.uid == request.resource.data.userId;
+          return request.auth != null && request.auth.uid == resource.data.userId;
+        }
+        function isCreatingOwnStatus() {
+           return request.auth != null && request.auth.uid == request.resource.data.userId;
         }
         allow read: if request.auth != null;
-        allow create: if isOwner();
-        allow write: if isOwner();
+        allow create: if isCreatingOwnStatus();
+        allow delete: if isOwner();
+        allow update: if false;
     }
 
 
@@ -165,6 +170,3 @@ service cloud.firestore {
     }
   }
 }
-
-
-    

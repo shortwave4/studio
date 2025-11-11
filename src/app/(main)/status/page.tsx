@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { PlusCircle, X, ImagePlus, Send, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, useStorage } from "@/firebase";
-import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs } from "firebase/firestore";
+import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,8 @@ type StatusUser = {
   avatarUrl: string;
   stories: StatusStory[];
 };
+
+let cleanupHasRun = false;
 
 export default function StatusPage() {
   const { user } = useUser();
@@ -65,6 +67,37 @@ export default function StatusPage() {
     ), [firestore, twentyFourHoursAgo]);
 
   const { data: allStatuses, isLoading: rawStatusesLoading } = useCollection<Omit<StatusStory, 'duration'>>(statusUpdatesQuery);
+
+    useEffect(() => {
+    const cleanupExpiredStatuses = async () => {
+      if (cleanupHasRun || !user) return;
+      cleanupHasRun = true; 
+
+      try {
+        const expiredStatusesQuery = query(
+          collection(firestore, 'status_updates'),
+          where('timestamp', '<', twentyFourHoursAgo)
+        );
+        
+        const expiredSnap = await getDocs(expiredStatusesQuery);
+        if (expiredSnap.empty) return;
+
+        const batch = writeBatch(firestore);
+        expiredSnap.forEach(docSnap => {
+            // Security rules will ensure user can only delete their own statuses
+            if (docSnap.data().userId === user.uid) {
+               batch.delete(docSnap.ref);
+            }
+        });
+        await batch.commit();
+
+      } catch (error) {
+        console.error("Failed to clean up expired statuses:", error);
+      }
+    };
+
+    cleanupExpiredStatuses();
+  }, [firestore, twentyFourHoursAgo, user]);
 
 
   useEffect(() => {
@@ -377,5 +410,3 @@ export default function StatusPage() {
     </div>
   );
 }
-
-    
