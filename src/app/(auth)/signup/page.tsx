@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ export default function SignupPage() {
     },
   });
 
-  const saveProfileWithLocation = (user: any, name: string, email: string, phoneNumber?: string) => {
+  const saveProfileWithLocation = (user: User, name: string, email: string, phoneNumber?: string) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -90,6 +90,7 @@ export default function SignupPage() {
             phoneNumber,
             profilePictureUrl: user.photoURL,
             coordinates: new GeoPoint(latitude, longitude),
+            fcmTokens: [],
           };
           const userRef = doc(firestore, "users", user.uid);
           setDocumentNonBlocking(userRef, userProfile, { merge: true });
@@ -103,7 +104,7 @@ export default function SignupPage() {
     }
   }
 
-  const saveProfileWithoutLocation = (user: any, name: string, email: string, phoneNumber?: string) => {
+  const saveProfileWithoutLocation = (user: User, name: string, email: string, phoneNumber?: string) => {
       const userProfile = {
         id: user.uid,
         name,
@@ -111,14 +112,15 @@ export default function SignupPage() {
         phoneNumber,
         profilePictureUrl: user.photoURL,
         coordinates: null,
+        fcmTokens: [],
       };
       const userRef = doc(firestore, "users", user.uid);
       setDocumentNonBlocking(userRef, userProfile, { merge: true });
   }
 
-  const handlePostSignup = (user: any, name: string, email: string, phoneNumber?: string) => {
+  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string) => {
     saveProfileWithLocation(user, name, email, phoneNumber);
-    requestPermission(firestore, user.uid);
+    await requestPermission(firestore, user.uid);
     router.push('/');
   }
 
@@ -127,7 +129,7 @@ export default function SignupPage() {
       const userCredential: UserCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       if (userCredential?.user) {
         await updateProfile(userCredential.user, { displayName: values.name });
-        handlePostSignup(userCredential.user, values.name, values.email, values.phoneNumber);
+        await handlePostSignup(userCredential.user, values.name, values.email, values.phoneNumber);
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -151,7 +153,7 @@ export default function SignupPage() {
     try {
         const result: UserCredential = await signInWithPopup(auth, provider);
         const user = result.user;
-        handlePostSignup(user, user.displayName!, user.email!);
+        await handlePostSignup(user, user.displayName!, user.email!);
     } catch (error: any) {
         toast({
             variant: "destructive",

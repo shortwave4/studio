@@ -6,8 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, UserCredential } from "firebase/auth";
-import { doc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, UserCredential, User } from "firebase/auth";
+import { doc, getDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase";
+import { useAuth, useFirestore, setDocumentNonBlocking, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -73,16 +73,25 @@ export default function LoginPage() {
     },
   });
 
-  const handlePostLogin = (user: any) => {
+  const handlePostLogin = async (user: User) => {
     const userRef = doc(firestore, "users", user.uid);
-    setDocumentNonBlocking(userRef, { lastLogin: new Date() }, { merge: true });
+    updateDocumentNonBlocking(userRef, { lastLogin: new Date() });
+    
+    // Check if user has FCM token, if not, request permission
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      if (!userData.fcmTokens || userData.fcmTokens.length === 0) {
+        await requestPermission(firestore, user.uid);
+      }
+    }
     router.push('/');
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/');
+      const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
+      await handlePostLogin(creds.user);
     } catch (error: any) {
        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
         toast({
@@ -111,10 +120,11 @@ export default function LoginPage() {
             id: user.uid,
             name: user.displayName,
             email: user.email,
-            profilePictureUrl: user.photoURL
+            profilePictureUrl: user.photoURL,
+            fcmTokens: [],
         }, { merge: true });
 
-        router.push('/');
+        await handlePostLogin(user);
     } catch (error: any) {
         toast({
             variant: "destructive",
