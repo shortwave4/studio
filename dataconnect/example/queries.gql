@@ -1,0 +1,36 @@
+mutation CreateUser($email: String!, $passwordHash: String!, $username: String!, $lastActiveAt: Timestamp!, $createdAt: Timestamp!) @auth(level: PUBLIC, insecureReason: "This mutation is safe to expose publicly as it is used for user registration.") {
+  user_insert(data: {email: $email, passwordHash: $passwordHash, username: $username, lastActiveAt: $lastActiveAt, createdAt: $createdAt})
+}
+
+query GetUser($id: UUID!) @auth(level: USER) {
+  user(id: $id) {
+    id
+    email
+    username
+    displayName
+    bio
+    profilePictureUrl
+    status
+    lastActiveAt
+    createdAt
+    locationCoordinates
+  }
+}
+
+mutation UpdateUser($id: UUID!, $bio: String, $displayName: String, $profilePictureUrl: String, $status: String, $locationCoordinates: Vector) @auth(level: USER) {
+  user_update(id: $id, data: {bio: $bio, displayName: $displayName, profilePictureUrl: $profilePictureUrl, status: $status, locationCoordinates: $locationCoordinates})
+}
+
+query ListGroupChats @auth(level: USER) {
+  groupChats {
+    id
+    name
+    description
+    creator {
+      id
+      username
+    }
+    createdAt
+    lastMessageAt
+  }
+}

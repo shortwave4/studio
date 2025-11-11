@@ -1,0 +1,42 @@
+type User @table {
+  username: String!
+  email: String!
+  passwordHash: String!
+  createdAt: Timestamp!
+  lastActiveAt: Timestamp!
+  locationCoordinates: Vector @col(size: 2) # [latitude, longitude]
+  displayName: String
+  bio: String
+  profilePictureUrl: String
+  status: String
+}
+
+type Chat @table {
+  participant1: User!
+  participant2: User!
+  createdAt: Timestamp!
+  lastMessageAt: Timestamp
+}
+
+type GroupChat @table {
+  creator: User!
+  name: String!
+  createdAt: Timestamp!
+  description: String
+  lastMessageAt: Timestamp
+}
+
+type Message @table {
+  sender: User!
+  chat: Chat
+  groupChat: GroupChat
+  content: String!
+  createdAt: Timestamp!
+  readBy: [UUID]
+}
+
+type UserGroupChat @table(key: ["user", "groupChat"]) {
+  user: User!
+  groupChat: GroupChat!
+  joinedAt: Timestamp!
+}

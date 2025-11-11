@@ -49,7 +49,10 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
         if (latitude && longitude) {
             const plainUsers = validUsers.map(u => ({
               ...u,
-              coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null
+              // Convert GeoPoint to a plain object for server action
+              coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null,
+              createdAt: undefined, // Remove any other complex objects
+              lastLogin: undefined,
             }));
 
             const suggestions = await suggestUsersByLocation({
@@ -58,7 +61,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
               users: plainUsers,
             });
             const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
-            setAllSuggestedUsers(filteredUsers);
+            setAllSuggestedUsers(filteredUsers as UserProfile[]);
         } else {
              const filteredUsers = validUsers.filter((u) => u.id !== user?.uid);
              setAllSuggestedUsers(filteredUsers);
