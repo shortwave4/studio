@@ -265,7 +265,7 @@ export default function StatusPage() {
             const downloadURL = await uploadToCloudinary(statusFile);
             
             const statusCollectionRef = collection(firestore, 'status_updates');
-            await addDocumentNonBlocking(statusCollectionRef, {
+            addDocumentNonBlocking(statusCollectionRef, {
                 mediaUrl: downloadURL,
                 timestamp: serverTimestamp(),
                 userId: user.uid,

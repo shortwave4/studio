@@ -190,7 +190,8 @@ export default function SettingsPage() {
         await updateProfile(auth.currentUser, { photoURL: downloadURL });
 
         const userDocRef = doc(firestore, 'users', user.uid);
-        await updateDoc(userDocRef, { profilePictureUrl: downloadURL });
+        // Use non-blocking update
+        updateDocumentNonBlocking(userDocRef, { profilePictureUrl: downloadURL });
 
         toast({
             title: "Avatar Updated!",

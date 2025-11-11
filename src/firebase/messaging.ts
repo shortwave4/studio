@@ -1,3 +1,4 @@
+
 'use client';
 
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';

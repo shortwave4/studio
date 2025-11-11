@@ -239,7 +239,7 @@ export default function ChatPage() {
     try {
       const downloadURL = await uploadToCloudinary(file);
 
-      await addDocumentNonBlocking(messagesCollection, {
+      addDocumentNonBlocking(messagesCollection, {
         text: '',
         senderId: user.uid,
         recipientId: selectedChat.id,
@@ -603,5 +603,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
