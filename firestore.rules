@@ -66,9 +66,9 @@ service cloud.firestore {
         }
         
         function isUpdatingLikesOrViews() {
-          let otherFields = request.resource.data.diff(resource.data).affectedKeys()
-            .removeAll(['likes', 'views']);
-          return otherFields.size() == 0;
+          let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+          // Allow updates if the *only* keys being changed are 'likes' or 'views'.
+          return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
         }
 
         allow read: if request.auth != null;
@@ -178,5 +178,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
