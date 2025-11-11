@@ -24,26 +24,17 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AdminPage() {
-  const { user } = useUser();
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: usersData, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
+  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
-  const [users, setUsers] = useState<UserProfile[]>([]);
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
   const [isSending, setIsSending] = useState(false);
   
-
-  useEffect(() => {
-    if (usersData) {
-      setUsers(usersData);
-    }
-  }, [usersData]);
-
   const isLoading = isAdminLoading || usersLoading;
 
   const handleSendNotification = async () => {
@@ -67,7 +58,7 @@ export default function AdminPage() {
     setIsSending(true);
     try {
       // Flatten all tokens from all users into a single array, filtering out undefined/null tokens
-      const allTokens = users.flatMap(u => u.fcmTokens || []).filter(Boolean) as string[];
+      const allTokens = users.flatMap(u => u.fcmTokens || []).filter(Boolean);
       const uniqueTokens = [...new Set(allTokens)];
 
       if (uniqueTokens.length === 0) {
@@ -207,7 +198,7 @@ export default function AdminPage() {
                           <TableCell>
                             {u.fcmTokens && u.fcmTokens.length > 0 ? (
                               <div className="flex flex-col gap-1">
-                                {u.fcmTokens.map((token, i) => (
+                                {[...new Set(u.fcmTokens)].map((token, i) => (
                                   <Badge key={i} variant="secondary" className="font-mono text-xs max-w-xs truncate">
                                     {token}
                                   </Badge>
