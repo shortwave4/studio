@@ -6,8 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, UserCredential, User } from "firebase/auth";
-import { doc, getDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, UserCredential, User, fetchSignInMethodsForEmail } from "firebase/auth";
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth, useFirestore, setDocumentNonBlocking, requestPermission, updateDocumentNonBlocking } from "@/firebase";
+import { useAuth, useFirestore, updateDocumentNonBlocking, requestPermission } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -75,6 +75,7 @@ export default function LoginPage() {
 
   const handlePostLogin = async (user: User) => {
     const userRef = doc(firestore, "users", user.uid);
+    // Only update last login time
     updateDocumentNonBlocking(userRef, { lastLogin: new Date() });
     
     // Check if user has FCM token, if not, request permission
@@ -93,19 +94,36 @@ export default function LoginPage() {
       const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
       await handlePostLogin(creds.user);
     } catch (error: any) {
-       if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-        toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: "Invalid email or password. Please try again.",
-        });
-      } else {
-        toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: "An unexpected error occurred. Please try again later.",
-        });
-      }
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+            try {
+                const methods = await fetchSignInMethodsForEmail(auth, values.email);
+                if (methods.includes('google.com')) {
+                    toast({
+                        variant: "destructive",
+                        title: "Google Account Detected",
+                        description: "This account uses Google. Please sign in with Google.",
+                    });
+                } else {
+                    toast({
+                        variant: "destructive",
+                        title: "Login Failed",
+                        description: "Invalid email or password. Please try again.",
+                    });
+                }
+            } catch (fetchError) {
+                 toast({
+                    variant: "destructive",
+                    title: "Login Failed",
+                    description: "Invalid email or password. Please try again.",
+                });
+            }
+        } else {
+            toast({
+                variant: "destructive",
+                title: "Login Failed",
+                description: "An unexpected error occurred. Please try again later.",
+            });
+        }
     }
   }
 
@@ -118,12 +136,13 @@ export default function LoginPage() {
         const userDoc = await getDoc(userRef);
 
         if (!userDoc.exists()) {
-            setDocumentNonBlocking(userRef, {
+            // Set document only if it does not exist, preserving existing fcmTokens if it does
+            await setDoc(userRef, {
                 id: user.uid,
                 name: user.displayName,
                 email: user.email,
                 profilePictureUrl: user.photoURL,
-                fcmTokens: [],
+                fcmTokens: [], // Initialize with empty array for new user
             }, { merge: true });
         }
 
@@ -208,3 +227,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
