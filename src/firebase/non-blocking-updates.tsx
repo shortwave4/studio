@@ -1,3 +1,4 @@
+
 'use client';
     
 import {
@@ -20,11 +21,14 @@ export function setDocumentNonBlocking(docRef: DocumentReference, data: any, opt
   setDoc(docRef, data, options || {}).catch(async (serverError) => {
     if (serverError.code === 'permission-denied') {
         const permissionError = new FirestorePermissionError({
-        path: docRef.path,
-        operation: options && ('merge' in options || 'mergeFields' in options) ? 'update' : 'create',
-        requestResourceData: data,
+          path: docRef.path,
+          operation: options && ('merge' in options || 'mergeFields' in options) ? 'update' : 'create',
+          requestResourceData: data,
         });
         errorEmitter.emit('permission-error', permissionError);
+    } else {
+        // Optional: Handle other types of errors differently if needed
+        console.error("Firestore setDoc error:", serverError);
     }
   });
   // Execution continues immediately
@@ -45,6 +49,8 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
             requestResourceData: data,
         });
         errorEmitter.emit('permission-error', permissionError);
+      } else {
+        console.error("Firestore addDoc error:", serverError);
       }
     });
   return promise;
@@ -64,6 +70,8 @@ export function updateDocumentNonBlocking(docRef: DocumentReference, data: any) 
             requestResourceData: data,
         });
         errorEmitter.emit('permission-error', permissionError);
+      } else {
+        console.error("Firestore updateDoc error:", serverError);
       }
     });
 }
@@ -81,6 +89,8 @@ export function deleteDocumentNonBlocking(docRef: DocumentReference) {
             operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
+      } else {
+        console.error("Firestore deleteDoc error:", serverError);
       }
     });
 }

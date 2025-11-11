@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -70,24 +71,23 @@ export function useDoc<T = any>(
         setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
         setIsLoading(false);
       },
-      async (error: FirestoreError) => {
-        if (error.code === 'permission-denied') {
+      async (err: FirestoreError) => {
+        if (err.code === 'permission-denied') {
             const contextualError = new FirestorePermissionError({
                 operation: 'get',
                 path: memoizedDocRef.path,
             });
-
-            setError(contextualError);
-            setData(null);
-            setIsLoading(false);
+            
+            // Do not set local error state, let the global handler manage it
+            // setError(contextualError);
 
             // trigger global error propagation
             errorEmitter.emit('permission-error', contextualError);
         } else {
-            setError(error);
-            setData(null);
-            setIsLoading(false);
+            setError(err);
         }
+        setData(null);
+        setIsLoading(false);
       }
     );
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -147,25 +148,26 @@ export function useCollection<T = any>(
         setError(null);
         setIsLoading(false);
       },
-      async (error: FirestoreError) => {
-        if (error.code === 'permission-denied') {
-            const path: string = (finalQuery as unknown as InternalQuery)._query.path.canonicalString()
+      async (err: FirestoreError) => { // Changed variable name to avoid shadowing
+        if (err.code === 'permission-denied') {
+            const path: string = (finalQuery as unknown as InternalQuery)._query.path.toString();
             const contextualError = new FirestorePermissionError({
                 operation: 'list',
-                path,
+                path: path,
             });
             
-            setError(contextualError);
-            setData(null);
-            setIsLoading(false);
+            // Do not set local error state, let the global handler manage it
+            // setError(contextualError); 
 
             // Emit the rich error for global handling
             errorEmitter.emit('permission-error', contextualError);
         } else {
-             setError(error);
-             setData(null);
-             setIsLoading(false);
+             // For other errors, you might still want to handle them locally
+             setError(err);
         }
+        // Always update loading state and clear data on error
+        setData(null);
+        setIsLoading(false);
       }
     );
 
