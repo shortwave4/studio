@@ -6,13 +6,15 @@ import { Firestore, doc, arrayUnion } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from './non-blocking-updates';
 
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
+  const messagingSupported = await isSupported();
+  if (!messagingSupported) {
+    console.log('Firebase Messaging is not supported in this browser.');
+    return null;
+  }
+  
   try {
     const app = getApp();
-    const messaging = await isSupported() ? getMessaging(app) : null;
-    if (!messaging) {
-      console.log('Firebase Messaging is not supported in this browser.');
-      return null;
-    }
+    const messaging = getMessaging(app);
     
     console.log('Requesting permission...');
     const permission = await Notification.requestPermission();
@@ -31,10 +33,11 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
         updateDocumentNonBlocking(userDocRef, {
             fcmTokens: arrayUnion(currentToken)
         });
+        return currentToken;
       } else {
         console.log('No registration token available. Request permission to generate one.');
+        return null;
       }
-      return currentToken;
     } else {
       console.log('Unable to get permission to notify.');
       return null;
