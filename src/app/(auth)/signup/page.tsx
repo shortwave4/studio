@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, fetchSignInMethodsForEmail } from "firebase/auth";
+import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, getAdditionalUserInfo } from "firebase/auth";
 import { doc, GeoPoint, getDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
@@ -82,14 +82,15 @@ export default function SignupPage() {
     const createUserDoc = (coordinates: GeoPoint | null) => {
         const userProfile = {
             id: user.uid,
-            name,
-            email,
+            name: name || user.displayName || 'New User',
+            email: email || user.email,
             phoneNumber: phoneNumber || null,
             profilePictureUrl: user.photoURL || `https://picsum.photos/seed/${user.uid}/200`,
             coordinates,
             fcmTokens: [],
             createdAt: new Date(),
         };
+        // This is a non-blocking write. It will not wait for the write to complete.
         setDocumentNonBlocking(userRef, userProfile);
     };
 
@@ -100,12 +101,10 @@ export default function SignupPage() {
                 createUserDoc(new GeoPoint(latitude, longitude));
             },
             () => {
-                // Fallback if geolocation fails or is denied
                 createUserDoc(null);
             }
         );
     } else {
-        // Fallback if geolocation is not supported
         createUserDoc(null);
     }
   };
@@ -113,31 +112,42 @@ export default function SignupPage() {
 
   const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string) => {
     const userRef = doc(firestore, 'users', user.uid);
-    const userDoc = await getDoc(userRef);
-
-    if (!userDoc.exists()) {
-        createUserProfile(user, name, email, phoneNumber);
+    try {
+        const userDoc = await getDoc(userRef);
+        // Only create the user profile if it doesn't already exist.
+        if (!userDoc.exists()) {
+            createUserProfile(user, name, email, phoneNumber);
+        }
+        
+        // Always request permission for notifications after signup.
+        await requestPermission(firestore, user.uid);
+        
+    } catch (error) {
+        console.error("Post-signup actions failed:", error);
+    } finally {
+        router.push('/');
     }
-    
-    await requestPermission(firestore, user.uid);
-    router.push('/');
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const userCredential: UserCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      if (userCredential?.user) {
-        await updateProfile(userCredential.user, { displayName: values.name });
-        await handlePostSignup(userCredential.user, values.name, values.email, values.phoneNumber);
+      const user = userCredential.user;
+      if (user) {
+        // Update Firebase Auth profile
+        await updateProfile(user, { displayName: values.name });
+        // Create Firestore profile and handle post-signup logic
+        await handlePostSignup(user, values.name, values.email, values.phoneNumber);
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         toast({
             variant: "destructive",
             title: "Signup Failed",
-            description: "This email is already registered. Please login or use a different email.",
+            description: "This email is already registered. Please login.",
         });
       } else {
+        console.error("Signup error:", error);
         toast({
             variant: "destructive",
             title: "Signup Failed",
@@ -152,30 +162,30 @@ export default function SignupPage() {
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        
-        const signInMethods = await fetchSignInMethodsForEmail(auth, user.email!);
-        
-        // If this is the first time the user is signing in with this email, it's a "signup".
-        // Otherwise, it's a "login".
-        if (signInMethods.length === 0 || (signInMethods.length === 1 && signInMethods[0] === 'google.com')) {
+        const additionalInfo = getAdditionalUserInfo(result);
+
+        // If it's a new user, handle the full signup flow.
+        // Otherwise, they are just logging in, so redirect them.
+        if (additionalInfo?.isNewUser) {
            await handlePostSignup(user, user.displayName!, user.email!);
         } else {
-           // User exists with another provider (e.g. password), so just log them in.
+           // Existing user is logging in via the signup page's Google button.
+           // Just redirect them to the main app.
            router.push('/');
         }
 
     } catch (error: any) {
-        // Don't show an error if the user closes the popup
         if (error.code === 'auth/popup-closed-by-user') {
-            return;
+            return; // User cancelled the popup, do nothing.
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
              toast({
                 variant: "destructive",
                 title: "Account Exists",
-                description: "An account already exists with this email address. Please sign in with your original method.",
+                description: "An account already exists with this email. Please sign in with your original method.",
             });
         } else {
+            console.error("Google Sign-In Error:", error);
             toast({
                 variant: "destructive",
                 title: "Google Sign-Up Failed",

@@ -74,56 +74,68 @@ export default function LoginPage() {
   });
 
   const handlePostLogin = async (user: User) => {
-    const userRef = doc(firestore, "users", user.uid);
-    // Only update last login time
-    updateDocumentNonBlocking(userRef, { lastLogin: new Date() });
-    
-    // Check if user has FCM token, if not, request permission
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      if (!userData.fcmTokens || userData.fcmTokens.length === 0) {
-        await requestPermission(firestore, user.uid);
-      }
+    // This function handles logic after a successful login, regardless of method.
+    // Check if the user document has an FCM token, if not, request permission.
+    try {
+        const userRef = doc(firestore, "users", user.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Update last login time non-blockingly
+            updateDocumentNonBlocking(userRef, { lastLogin: new Date() });
+            
+            // Request permission if no tokens exist
+            if (!userData.fcmTokens || userData.fcmTokens.length === 0) {
+                await requestPermission(firestore, user.uid);
+            }
+        }
+    } catch (error) {
+        // This part is not critical for login, so we just log the error
+        console.error("Post-login actions failed:", error);
+    } finally {
+        // Always redirect user after login attempt
+        router.push('/');
     }
-    router.push('/');
   }
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
       await handlePostLogin(creds.user);
     } catch (error: any) {
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-            try {
-                const methods = await fetchSignInMethodsForEmail(auth, values.email);
-                if (methods.includes('google.com')) {
-                    toast({
-                        variant: "destructive",
-                        title: "Google Account Detected",
-                        description: "This account uses Google. Please sign in with Google.",
-                    });
-                } else {
-                    toast({
-                        variant: "destructive",
-                        title: "Login Failed",
-                        description: "Invalid email or password. Please try again.",
-                    });
-                }
-            } catch (fetchError) {
-                 toast({
-                    variant: "destructive",
-                    title: "Login Failed",
-                    description: "Invalid email or password. Please try again.",
-                });
-            }
-        } else {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        try {
+          const methods = await fetchSignInMethodsForEmail(auth, values.email);
+          if (methods.includes('google.com')) {
             toast({
-                variant: "destructive",
-                title: "Login Failed",
-                description: "An unexpected error occurred. Please try again later.",
+              variant: "destructive",
+              title: "Google Account Detected",
+              description: "This account uses Google. Please sign in with Google.",
             });
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Login Failed",
+              description: "Invalid email or password. Please try again.",
+            });
+          }
+        } catch (fetchError) {
+          toast({
+            variant: "destructive",
+            title: "Login Failed",
+            description: "Invalid email or password. Please try again.",
+          });
         }
+      } else {
+        console.error("Login error:", error);
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: "An unexpected error occurred. Please try again later.",
+        });
+      }
     }
   }
 
@@ -131,16 +143,14 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
         const result = await signInWithPopup(auth, provider);
-        // After signing in, we just need to redirect. Profile creation is handled at signup.
-        // If a user signs in with Google for the first time, they should be directed
-        // through the signup flow, which correctly creates the profile. This login
-        // page assumes an account already exists.
+        // On login, we assume the user profile already exists from signup.
+        // We just need to perform post-login actions.
         await handlePostLogin(result.user);
     } catch (error: any) {
-        // Don't show an error if the user closes the popup
         if (error.code === 'auth/popup-closed-by-user') {
-            return;
+            return; // User cancelled the popup, do nothing.
         }
+        console.error("Google Sign-In Error:", error);
         toast({
             variant: "destructive",
             title: "Google Sign-In Failed",
