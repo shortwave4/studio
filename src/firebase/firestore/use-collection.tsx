@@ -86,7 +86,7 @@ export function useCollection<T = any>(
   type StateDataType = ResultItemType[] | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   const finalQuery = useMemo(() => {
@@ -147,19 +147,19 @@ export function useCollection<T = any>(
         setError(null);
         setIsLoading(false);
       },
-      (error: FirestoreError) => {
+      async (error: FirestoreError) => {
         if (error.code === 'permission-denied') {
             const path: string = (finalQuery as unknown as InternalQuery)._query.path.canonicalString()
             const contextualError = new FirestorePermissionError({
-            operation: 'list',
-            path,
+                operation: 'list',
+                path,
             });
             
-            setError(contextualError); // Set local state for UI feedback if needed
+            setError(contextualError);
             setData(null);
             setIsLoading(false);
 
-            // Emit the rich error for global handling (e.g., development overlay)
+            // Emit the rich error for global handling
             errorEmitter.emit('permission-error', contextualError);
         } else {
              setError(error);

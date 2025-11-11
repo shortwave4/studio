@@ -21,7 +21,7 @@ export function setDocumentNonBlocking(docRef: DocumentReference, data: any, opt
     if (serverError.code === 'permission-denied') {
         const permissionError = new FirestorePermissionError({
         path: docRef.path,
-        operation: options && 'merge' in options ? 'update' : 'create',
+        operation: options && ('merge' in options || 'mergeFields' in options) ? 'update' : 'create',
         requestResourceData: data,
         });
         errorEmitter.emit('permission-error', permissionError);
