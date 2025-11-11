@@ -2,10 +2,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser, useAuth, useFirestore, useStorage, requestPermission, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useAuth, useFirestore, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { updateProfile } from "firebase/auth";
 import { doc, GeoPoint, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -16,12 +15,12 @@ import { Switch } from "@/components/ui/switch";
 import { BellRing, MapPin, Camera, Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export default function SettingsPage() {
   const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
-  const storage = useStorage();
   const { toast } = useToast();
 
   const [name, setName] = useState("");
@@ -181,18 +180,12 @@ export default function SettingsPage() {
   };
   
   const handleAvatarSave = async (imageBlob: Blob) => {
-    if (!user || !storage || !auth.currentUser) return;
+    if (!user || !auth.currentUser) return;
     
     setIsUploading(true);
     
     try {
-        const filePath = `profile-images/${user.uid}.jpg`;
-        const storageRef = ref(storage, filePath);
-        
-        const snapshot = await uploadBytes(storageRef, imageBlob, {
-            contentType: 'image/jpeg'
-        });
-        const downloadURL = await getDownloadURL(snapshot.ref);
+        const downloadURL = await uploadToCloudinary(imageBlob);
 
         await updateProfile(auth.currentUser, { photoURL: downloadURL });
 

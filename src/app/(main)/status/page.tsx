@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, X, ImagePlus, Send, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, useStorage } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase";
 import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import type { UserProfile } from "@/types";
 import { Card } from "@/components/ui/card";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 type StatusStory = {
   id: string;
@@ -38,7 +38,6 @@ let cleanupHasRun = false;
 export default function StatusPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const storage = useStorage();
   const { toast } = useToast();
   const [activeUser, setActiveUser] = useState<StatusUser | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState(0);
@@ -84,10 +83,7 @@ export default function StatusPage() {
 
         const batch = writeBatch(firestore);
         expiredSnap.forEach(docSnap => {
-            // Security rules will ensure user can only delete their own statuses
-            if (docSnap.data().userId === user.uid) {
-               batch.delete(docSnap.ref);
-            }
+          batch.delete(docSnap.ref);
         });
         await batch.commit();
 
@@ -247,13 +243,11 @@ export default function StatusPage() {
     };
 
     const handleUpload = async () => {
-        if (!statusFile || !user || !storage) return;
+        if (!statusFile || !user) return;
 
         setIsUploading(true);
         try {
-            const storageRef = ref(storage, `status_updates/${user.uid}/${Date.now()}_${statusFile.name}`);
-            const snapshot = await uploadBytes(storageRef, statusFile);
-            const downloadURL = await getDownloadURL(snapshot.ref);
+            const downloadURL = await uploadToCloudinary(statusFile);
             
             const statusCollectionRef = collection(firestore, 'status_updates');
             await addDocumentNonBlocking(statusCollectionRef, {

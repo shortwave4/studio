@@ -10,11 +10,6 @@ import {
   doc,
 } from 'firebase/firestore';
 import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
-import {
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -27,7 +22,6 @@ import {
   useUser,
   useFirestore,
   addDocumentNonBlocking,
-  useStorage,
   useCollection,
   useMemoFirebase,
   deleteDocumentNonBlocking,
@@ -50,6 +44,7 @@ import type { ChatContact, Message } from '@/types/chat';
 import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -58,7 +53,6 @@ function getChatId(uid1: string, uid2: string) {
 export default function ChatPage() {
   const isMobile = useIsMobile();
   const firestore = useFirestore();
-  const storage = useStorage();
   const { user } = useUser();
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -237,15 +231,13 @@ export default function ChatPage() {
     fileInputRef.current?.click();
   };
 
-  const uploadMedia = async (file: Blob, fileName: string, type: 'image' | 'audio' | 'video') => {
-    if (!storage || !user || !messagesCollection || !chatId || !selectedChat) {
+  const uploadMedia = async (file: Blob, type: 'image' | 'audio' | 'video') => {
+    if (!user || !messagesCollection || !chatId || !selectedChat) {
       return;
     }
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `chat_media/${chatId}/${Date.now()}_${fileName}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      const downloadURL = await uploadToCloudinary(file);
 
       await addDocumentNonBlocking(messagesCollection, {
         text: '',
@@ -294,7 +286,7 @@ export default function ChatPage() {
     }
     
     if (fileType) {
-        uploadMedia(file, file.name, fileType);
+        uploadMedia(file, fileType);
     }
   };
 
@@ -311,7 +303,7 @@ export default function ChatPage() {
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        uploadMedia(audioBlob, 'voice-message.webm', 'audio');
+        uploadMedia(audioBlob, 'audio');
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
       };
