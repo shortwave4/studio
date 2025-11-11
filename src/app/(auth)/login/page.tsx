@@ -105,39 +105,48 @@ export default function LoginPage() {
       const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
       await handlePostLogin(creds.user);
     } catch (error: any) {
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-        try {
-          const methods = await fetchSignInMethodsForEmail(auth, values.email);
-          if (methods.includes('google.com')) {
-            toast({
-              variant: "destructive",
-              title: "Google Account Detected",
-              description: "This account uses Google. Please sign in with Google.",
+        if (error.code === 'auth/invalid-credential') {
+            try {
+                const methods = await fetchSignInMethodsForEmail(auth, values.email);
+                if (methods.includes('google.com')) {
+                    toast({
+                        variant: "destructive",
+                        title: "Google Account Detected",
+                        description: "This account uses Google. Please sign in with Google.",
+                    });
+                } else {
+                    toast({
+                        variant: "destructive",
+                        title: "Login Failed",
+                        description: "Invalid email or password. Please try again.",
+                    });
+                }
+            } catch (fetchError) {
+                // This might happen if email is badly formatted, though Zod should prevent it.
+                 toast({
+                    variant: "destructive",
+                    title: "Login Failed",
+                    description: "Invalid email or password. Please try again.",
+                });
+            }
+        } else if (error.code === 'auth/user-not-found') {
+             toast({
+                variant: "destructive",
+                title: "Login Failed",
+                description: "Invalid email or password. Please try again.",
             });
-          } else {
-            toast({
-              variant: "destructive",
-              title: "Login Failed",
-              description: "Invalid email or password. Please try again.",
-            });
-          }
-        } catch (fetchError) {
-          toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: "Invalid email or password. Please try again.",
-          });
         }
-      } else {
-        console.error("Login error:", error);
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "An unexpected error occurred. Please try again later.",
-        });
-      }
+        else {
+            console.error("Login error:", error);
+            toast({
+                variant: "destructive",
+                title: "Login Failed",
+                description: "An unexpected error occurred. Please try again later.",
+            });
+        }
     }
-  }
+}
+
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
