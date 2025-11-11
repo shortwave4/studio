@@ -183,7 +183,7 @@ export default function ProductsPage() {
                 <Button asChild className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
                   <a href={product.affiliateLink} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    Get It Now
+                    view product
                   </a>
                 </Button>
               </CardFooter>
@@ -200,5 +200,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
-    
