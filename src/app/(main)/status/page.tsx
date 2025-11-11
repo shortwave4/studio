@@ -6,10 +6,10 @@ import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { PlusCircle, X, ImagePlus, Send, XCircle } from "lucide-react";
+import { PlusCircle, X, ImagePlus, Send, XCircle, Heart, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase";
-import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc } from "firebase/firestore";
+import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ type StatusStory = {
   text?: string;
   timestamp: Timestamp;
   duration: number;
+  views: string[];
+  likes: string[];
 };
 
 type StatusUser = {
@@ -115,7 +117,7 @@ export default function StatusPage() {
       const storyAuthor = usersMap.get(status.userId);
       if (!storyAuthor) return;
 
-      const story: StatusStory = { ...status, duration: 5000 };
+      const story: StatusStory = { ...status, duration: 5000, views: status.views || [], likes: status.likes || [] };
 
       if (statusesByUser.has(status.userId)) {
         statusesByUser.get(status.userId)!.stories.push(story);
@@ -169,12 +171,25 @@ export default function StatusPage() {
       }
     }
   }, [activeUser, activeStoryIndex, statuses, handleSelectUser, closeStatus]);
+  
+  const handleViewStory = useCallback((storyId: string) => {
+    if (!user || !firestore) return;
+    const storyRef = doc(firestore, 'status_updates', storyId);
+    updateDocumentNonBlocking(storyRef, {
+        views: arrayUnion(user.uid)
+    });
+  }, [user, firestore]);
+
 
   const startTimer = useCallback(() => {
-    if (!activeUser) return;
+    if (!activeUser || !user) return;
     
     const story = activeUser.stories[activeStoryIndex];
     if (!story) return;
+
+    if (!story.views.includes(user.uid)) {
+        handleViewStory(story.id);
+    }
 
     setProgress(0);
     clearInterval(progressTimerRef.current);
@@ -195,7 +210,7 @@ export default function StatusPage() {
       handleNextStory();
     }, story.duration);
 
-  }, [activeUser, activeStoryIndex, handleNextStory]);
+  }, [activeUser, activeStoryIndex, handleNextStory, user, handleViewStory]);
 
   useEffect(() => {
     if (activeUser && !isStoryLoading) {
@@ -254,7 +269,9 @@ export default function StatusPage() {
                 mediaUrl: downloadURL,
                 timestamp: serverTimestamp(),
                 userId: user.uid,
-                type: 'image', 
+                type: 'image',
+                views: [],
+                likes: [],
             });
             
             toast({ title: "Status Added!", description: "Your new status is now live." });
@@ -276,8 +293,19 @@ export default function StatusPage() {
         }
     }
 
+    const handleLikeToggle = (storyId: string, currentLikes: string[]) => {
+        if (!user) return;
+        const storyRef = doc(firestore, 'status_updates', storyId);
+        if (currentLikes.includes(user.uid)) {
+            updateDocumentNonBlocking(storyRef, { likes: arrayRemove(user.uid) });
+        } else {
+            updateDocumentNonBlocking(storyRef, { likes: arrayUnion(user.uid) });
+        }
+    };
+
   if (activeUser) {
       const activeStory = activeUser.stories[activeStoryIndex];
+      const isLiked = user ? activeStory?.likes.includes(user.uid) : false;
     return (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onMouseDown={closeStatus} onTouchStart={closeStatus}>
             <div className="relative w-full max-w-sm h-full max-h-[95vh] md:max-h-[80vh] aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl" onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
@@ -314,6 +342,33 @@ export default function StatusPage() {
                         <X className="w-6 h-6"/>
                     </Button>
                 </div>
+                
+                 {activeStory && (
+                    <div className="absolute bottom-4 left-4 z-20 flex items-center gap-4 text-white">
+                        <div className="flex items-center gap-1.5">
+                            <Eye className="w-5 h-5"/>
+                            <span className="text-sm font-medium">{activeStory.views?.length || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <Heart className="w-5 h-5"/>
+                            <span className="text-sm font-medium">{activeStory.likes?.length || 0}</span>
+                        </div>
+                    </div>
+                 )}
+
+                {activeStory && user?.uid !== activeStory.userId && (
+                    <div className="absolute bottom-4 right-4 z-20">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-white h-10 w-10 hover:bg-white/10 hover:text-white"
+                            onClick={() => handleLikeToggle(activeStory.id, activeStory.likes)}
+                        >
+                            <Heart className={cn("w-6 h-6 transition-all", isLiked ? "fill-red-500 text-red-500" : "")} />
+                        </Button>
+                    </div>
+                )}
+
 
                  <div className="absolute left-0 top-0 h-full w-1/3 z-10" onMouseDown={handlePrevStory} onTouchEnd={handlePrevStory}/>
                  <div className="absolute right-0 top-0 h-full w-1/3 z-10" onMouseDown={handleNextStory} onTouchEnd={handleNextStory}/>
@@ -404,3 +459,5 @@ export default function StatusPage() {
     </div>
   );
 }
+
+    

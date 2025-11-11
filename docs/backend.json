@@ -212,6 +212,20 @@
         "type": {
           "type": "string",
           "description": "Type of status update (e.g., text, image, video)."
+        },
+        "views": {
+          "type": "array",
+          "description": "List of user IDs who have viewed the status.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "likes": {
+          "type": "array",
+          "description": "List of user IDs who have liked the status.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -405,5 +419,4 @@
   }
 }
     
-
     
