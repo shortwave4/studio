@@ -77,20 +77,19 @@ export default function SignupPage() {
     },
   });
 
-  const createUserProfile = (user: User, name: string, email: string, phoneNumber?: string) => {
+  const createUserProfile = (user: User, name: string, email: string, phoneNumber?: string, photoURL?: string | null) => {
     const userRef = doc(firestore, "users", user.uid);
     const createUserDoc = (coordinates: GeoPoint | null) => {
         const userProfile = {
             id: user.uid,
-            name: name || user.displayName || 'New User',
-            email: email || user.email,
+            name: name,
+            email: email,
             phoneNumber: phoneNumber || null,
-            profilePictureUrl: user.photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+            profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
             coordinates,
             fcmTokens: [],
             createdAt: new Date(),
         };
-        // This is a non-blocking write. It will not wait for the write to complete.
         setDocumentNonBlocking(userRef, userProfile);
     };
 
@@ -101,7 +100,7 @@ export default function SignupPage() {
                 createUserDoc(new GeoPoint(latitude, longitude));
             },
             () => {
-                createUserDoc(null);
+                createUserDoc(null); 
             }
         );
     } else {
@@ -110,16 +109,14 @@ export default function SignupPage() {
   };
 
 
-  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string) => {
+  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string, photoURL?: string | null) => {
     const userRef = doc(firestore, 'users', user.uid);
     try {
         const userDoc = await getDoc(userRef);
-        // Only create the user profile if it doesn't already exist.
         if (!userDoc.exists()) {
-            createUserProfile(user, name, email, phoneNumber);
+            createUserProfile(user, name, email, phoneNumber, photoURL);
         }
         
-        // Always request permission for notifications after signup.
         await requestPermission(firestore, user.uid);
         
     } catch (error) {
@@ -134,10 +131,8 @@ export default function SignupPage() {
       const userCredential: UserCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
       if (user) {
-        // Update Firebase Auth profile
         await updateProfile(user, { displayName: values.name });
-        // Create Firestore profile and handle post-signup logic
-        await handlePostSignup(user, values.name, values.email, values.phoneNumber);
+        await handlePostSignup(user, values.name, values.email, values.phoneNumber, user.photoURL);
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -164,13 +159,11 @@ export default function SignupPage() {
         const user = result.user;
         const additionalInfo = getAdditionalUserInfo(result);
 
-        // If it's a new user, handle the full signup flow.
-        // Otherwise, they are just logging in, so redirect them.
         if (additionalInfo?.isNewUser) {
-           await handlePostSignup(user, user.displayName!, user.email!);
+           await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
         } else {
-           // Existing user is logging in via the signup page's Google button.
-           // Just redirect them to the main app.
+           // Existing user is just logging in via the signup page's Google button.
+           // Their profile should already exist. Just redirect.
            router.push('/');
         }
 

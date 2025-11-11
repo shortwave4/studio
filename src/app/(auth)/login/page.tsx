@@ -74,27 +74,25 @@ export default function LoginPage() {
   });
 
   const handlePostLogin = async (user: User) => {
-    // This function handles logic after a successful login, regardless of method.
-    // Check if the user document has an FCM token, if not, request permission.
+    // This function handles logic after any successful login.
     try {
         const userRef = doc(firestore, "users", user.uid);
         const userDoc = await getDoc(userRef);
 
         if (userDoc.exists()) {
             const userData = userDoc.data();
-            // Update last login time non-blockingly
             updateDocumentNonBlocking(userRef, { lastLogin: new Date() });
             
-            // Request permission if no tokens exist
             if (!userData.fcmTokens || userData.fcmTokens.length === 0) {
                 await requestPermission(firestore, user.uid);
             }
         }
+        // If the doc doesn't exist, it means something went wrong during signup.
+        // The signup flow is the single source of truth for profile creation.
+        // We will not create a profile here to avoid inconsistencies.
     } catch (error) {
-        // This part is not critical for login, so we just log the error
         console.error("Post-login actions failed:", error);
     } finally {
-        // Always redirect user after login attempt
         router.push('/');
     }
   }
@@ -122,7 +120,6 @@ export default function LoginPage() {
                     });
                 }
             } catch (fetchError) {
-                // This might happen if email is badly formatted, though Zod should prevent it.
                  toast({
                     variant: "destructive",
                     title: "Login Failed",
