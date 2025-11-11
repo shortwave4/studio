@@ -77,11 +77,6 @@ export function useDoc<T = any>(
                 operation: 'get',
                 path: memoizedDocRef.path,
             });
-            
-            // Do not set local error state, let the global handler manage it
-            // setError(contextualError);
-
-            // trigger global error propagation
             errorEmitter.emit('permission-error', contextualError);
         } else {
             setError(err);
