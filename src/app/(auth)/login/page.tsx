@@ -26,7 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth, useFirestore, updateDocumentNonBlocking, requestPermission } from "@/firebase";
+import { useAuth, useFirestore, updateDocumentNonBlocking, requestPermission, setDocumentNonBlocking } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -136,18 +136,21 @@ export default function LoginPage() {
         const userDoc = await getDoc(userRef);
 
         if (!userDoc.exists()) {
-            // Set document only if it does not exist, preserving existing fcmTokens if it does
-            await setDoc(userRef, {
+            setDocumentNonBlocking(userRef, {
                 id: user.uid,
                 name: user.displayName,
                 email: user.email,
                 profilePictureUrl: user.photoURL,
-                fcmTokens: [], // Initialize with empty array for new user
+                fcmTokens: [],
             }, { merge: true });
         }
 
         await handlePostLogin(user);
     } catch (error: any) {
+        // Don't show an error if the user closes the popup
+        if (error.code === 'auth/popup-closed-by-user') {
+            return;
+        }
         toast({
             variant: "destructive",
             title: "Google Sign-In Failed",
@@ -227,5 +230,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    

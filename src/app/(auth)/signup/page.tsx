@@ -157,6 +157,10 @@ export default function SignupPage() {
         const user = result.user;
         await handlePostSignup(user, user.displayName!, user.email!);
     } catch (error: any) {
+        // Don't show an error if the user closes the popup
+        if (error.code === 'auth/popup-closed-by-user') {
+            return;
+        }
         toast({
             variant: "destructive",
             title: "Google Sign-Up Failed",
