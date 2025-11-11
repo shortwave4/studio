@@ -115,14 +115,17 @@ export default function LoginPage() {
         const result: UserCredential = await signInWithPopup(auth, provider);
         const user = result.user;
         const userRef = doc(firestore, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
 
-        setDocumentNonBlocking(userRef, {
-            id: user.uid,
-            name: user.displayName,
-            email: user.email,
-            profilePictureUrl: user.photoURL,
-            fcmTokens: [],
-        }, { merge: true });
+        if (!userDoc.exists()) {
+            setDocumentNonBlocking(userRef, {
+                id: user.uid,
+                name: user.displayName,
+                email: user.email,
+                profilePictureUrl: user.photoURL,
+                fcmTokens: [],
+            }, { merge: true });
+        }
 
         await handlePostLogin(user);
     } catch (error: any) {

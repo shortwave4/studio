@@ -96,10 +96,12 @@ export default function SignupPage() {
           setDocumentNonBlocking(userRef, userProfile, { merge: true });
         },
         () => {
+          // Fallback if geolocation fails
           saveProfileWithoutLocation(user, name, email, phoneNumber);
         }
       );
     } else {
+      // Fallback if geolocation is not supported
       saveProfileWithoutLocation(user, name, email, phoneNumber);
     }
   }
