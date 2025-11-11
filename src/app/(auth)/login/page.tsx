@@ -6,8 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, UserCredential, User, fetchSignInMethodsForEmail } from "firebase/auth";
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, fetchSignInMethodsForEmail } from "firebase/auth";
+import { doc, getDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth, useFirestore, updateDocumentNonBlocking, requestPermission, setDocumentNonBlocking } from "@/firebase";
+import { useAuth, useFirestore, updateDocumentNonBlocking, requestPermission } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -130,22 +130,12 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-        const result: UserCredential = await signInWithPopup(auth, provider);
-        const user = result.user;
-        const userRef = doc(firestore, 'users', user.uid);
-        const userDoc = await getDoc(userRef);
-
-        if (!userDoc.exists()) {
-            setDocumentNonBlocking(userRef, {
-                id: user.uid,
-                name: user.displayName,
-                email: user.email,
-                profilePictureUrl: user.photoURL,
-                fcmTokens: [],
-            }, { merge: true });
-        }
-
-        await handlePostLogin(user);
+        const result = await signInWithPopup(auth, provider);
+        // After signing in, we just need to redirect. Profile creation is handled at signup.
+        // If a user signs in with Google for the first time, they should be directed
+        // through the signup flow, which correctly creates the profile. This login
+        // page assumes an account already exists.
+        await handlePostLogin(result.user);
     } catch (error: any) {
         // Don't show an error if the user closes the popup
         if (error.code === 'auth/popup-closed-by-user') {

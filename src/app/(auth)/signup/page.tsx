@@ -7,8 +7,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from "firebase/auth";
-import { doc, GeoPoint } from "firebase/firestore";
+import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, fetchSignInMethodsForEmail } from "firebase/auth";
+import { doc, GeoPoint, getDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,12 +32,11 @@ import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 
-
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-  phoneNumber: z.string().min(10, { message: "Please enter a valid phone number." }),
+  phoneNumber: z.string().optional(),
 });
 
 const GoogleIcon = () => (
@@ -78,50 +77,48 @@ export default function SignupPage() {
     },
   });
 
-  const saveProfileWithLocation = (user: User, name: string, email: string, phoneNumber?: string) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const userProfile = {
+  const createUserProfile = (user: User, name: string, email: string, phoneNumber?: string) => {
+    const userRef = doc(firestore, "users", user.uid);
+    const createUserDoc = (coordinates: GeoPoint | null) => {
+        const userProfile = {
             id: user.uid,
             name,
             email,
-            phoneNumber,
-            profilePictureUrl: user.photoURL,
-            coordinates: new GeoPoint(latitude, longitude),
+            phoneNumber: phoneNumber || null,
+            profilePictureUrl: user.photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+            coordinates,
             fcmTokens: [],
-          };
-          const userRef = doc(firestore, "users", user.uid);
-          setDocumentNonBlocking(userRef, userProfile, { merge: true });
-        },
-        () => {
-          // Fallback if geolocation fails
-          saveProfileWithoutLocation(user, name, email, phoneNumber);
-        }
-      );
-    } else {
-      // Fallback if geolocation is not supported
-      saveProfileWithoutLocation(user, name, email, phoneNumber);
-    }
-  }
+            createdAt: new Date(),
+        };
+        setDocumentNonBlocking(userRef, userProfile);
+    };
 
-  const saveProfileWithoutLocation = (user: User, name: string, email: string, phoneNumber?: string) => {
-      const userProfile = {
-        id: user.uid,
-        name,
-        email,
-        phoneNumber,
-        profilePictureUrl: user.photoURL,
-        coordinates: null,
-        fcmTokens: [],
-      };
-      const userRef = doc(firestore, "users", user.uid);
-      setDocumentNonBlocking(userRef, userProfile, { merge: true });
-  }
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                createUserDoc(new GeoPoint(latitude, longitude));
+            },
+            () => {
+                // Fallback if geolocation fails or is denied
+                createUserDoc(null);
+            }
+        );
+    } else {
+        // Fallback if geolocation is not supported
+        createUserDoc(null);
+    }
+  };
+
 
   const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string) => {
-    saveProfileWithLocation(user, name, email, phoneNumber);
+    const userRef = doc(firestore, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+        createUserProfile(user, name, email, phoneNumber);
+    }
+    
     await requestPermission(firestore, user.uid);
     router.push('/');
   }
@@ -153,19 +150,38 @@ export default function SignupPage() {
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-        const result: UserCredential = await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        await handlePostSignup(user, user.displayName!, user.email!);
+        
+        const signInMethods = await fetchSignInMethodsForEmail(auth, user.email!);
+        
+        // If this is the first time the user is signing in with this email, it's a "signup".
+        // Otherwise, it's a "login".
+        if (signInMethods.length === 0 || (signInMethods.length === 1 && signInMethods[0] === 'google.com')) {
+           await handlePostSignup(user, user.displayName!, user.email!);
+        } else {
+           // User exists with another provider (e.g. password), so just log them in.
+           router.push('/');
+        }
+
     } catch (error: any) {
         // Don't show an error if the user closes the popup
         if (error.code === 'auth/popup-closed-by-user') {
             return;
         }
-        toast({
-            variant: "destructive",
-            title: "Google Sign-Up Failed",
-            description: error.message || "Could not sign up with Google. Please try again.",
-        });
+        if (error.code === 'auth/account-exists-with-different-credential') {
+             toast({
+                variant: "destructive",
+                title: "Account Exists",
+                description: "An account already exists with this email address. Please sign in with your original method.",
+            });
+        } else {
+            toast({
+                variant: "destructive",
+                title: "Google Sign-Up Failed",
+                description: error.message || "Could not sign up with Google. Please try again.",
+            });
+        }
     }
   };
 
@@ -225,7 +241,7 @@ export default function SignupPage() {
               name="phoneNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
+                  <FormLabel>Phone Number (Optional)</FormLabel>
                   <FormControl>
                     <Input type="tel" placeholder="Your Phone Number" {...field} />
                   </FormControl>
