@@ -48,16 +48,22 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
-
-      /**
-       * @description Secures status updates for a user. Only the user can manage their own statuses.
-       * @path /users/{userId}/status_updates/{statusId}
-       */
-      match /status_updates/{statusId} {
-        allow read: if request.auth != null;
-        allow write: if isOwner();
-      }
     }
+    
+    /**
+     * @description Secures status updates. Any authenticated user can read statuses.
+     * Users can only create status updates for themselves.
+     * @path /status_updates/{statusId}
+     */
+    match /status_updates/{statusId} {
+        function isOwner() {
+          return request.auth != null && request.auth.uid == request.resource.data.userId;
+        }
+        allow read: if request.auth != null;
+        allow create: if isOwner();
+        allow write: if isOwner();
+    }
+
 
     /**
      * @description Secures one-on-one chat messages.
@@ -159,5 +165,6 @@ service cloud.firestore {
     }
   }
 }
+
 
     

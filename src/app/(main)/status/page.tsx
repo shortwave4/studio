@@ -8,16 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, X, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, addDocumentNonBlocking, useStorage } from "@/firebase";
-import { collection, query, where, Timestamp, getDocs, serverTimestamp } from "firebase/firestore";
+import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, useStorage } from "@/firebase";
+import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import type { UserProfile } from "@/types";
 
 type StatusStory = {
   id: string;
+  userId: string;
   mediaUrl: string;
   text?: string;
   timestamp: Timestamp;
@@ -29,7 +31,6 @@ type StatusUser = {
   name: string;
   avatarUrl: string;
   stories: StatusStory[];
-  hasNew: boolean;
 };
 
 export default function StatusPage() {
@@ -46,64 +47,69 @@ export default function StatusPage() {
   const [isAddStatusOpen, setIsAddStatusOpen] = useState(false);
   
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: users, isLoading: usersLoading } = useCollection(usersCollectionRef);
+  const { data: usersData, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   const [statuses, setStatuses] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(true);
+  
+  const twentyFourHoursAgo = useMemo(() => Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000), []);
+  const statusUpdatesQuery = useMemoFirebase(() => query(
+      collection(firestore, 'status_updates'), 
+      where('timestamp', '>=', twentyFourHoursAgo),
+      orderBy('timestamp', 'desc')
+    ), [firestore, twentyFourHoursAgo]);
 
-  const fetchStatuses = useCallback(async () => {
-    if (!users || users.length === 0) {
-      if (!usersLoading) setStatusesLoading(false);
-      return;
-    }
-
-    setStatusesLoading(true);
-    const twentyFourHoursAgo = Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
-
-    const userStatusPromises = users.map(async (u) => {
-      if (!u.id) return null;
-      const statusUpdatesRef = collection(firestore, 'users', u.id, 'status_updates');
-      const q = query(statusUpdatesRef, where('timestamp', '>=', twentyFourHoursAgo));
-      
-      try {
-        const statusSnap = await getDocs(q);
-        
-        if (statusSnap.empty) return null;
-
-        const stories: StatusStory[] = statusSnap.docs.map(doc => ({
-          id: doc.id,
-          mediaUrl: doc.data().mediaUrl,
-          text: doc.data().text,
-          timestamp: doc.data().timestamp,
-          duration: 5000,
-        })).sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-
-        return {
-          id: u.id,
-          name: u.name,
-          avatarUrl: u.profilePictureUrl || `https://picsum.photos/seed/${u.id}/200`,
-          stories,
-          hasNew: true,
-        };
-      } catch (serverError) {
-        const permissionError = new FirestorePermissionError({
-          path: statusUpdatesRef.path,
-          operation: 'list', 
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        return null;
-      }
-    });
-
-    const results = (await Promise.all(userStatusPromises)).filter(Boolean) as StatusUser[];
-    setStatuses(results);
-    setStatusesLoading(false);
-  }, [firestore, users, usersLoading]);
+  const { data: allStatuses, isLoading: rawStatusesLoading } = useCollection<Omit<StatusStory, 'duration'>>(statusUpdatesQuery);
 
 
   useEffect(() => {
-    fetchStatuses();
-  }, [fetchStatuses]);
+    if (rawStatusesLoading || usersLoading) {
+      setStatusesLoading(true);
+      return;
+    }
+
+    if (!allStatuses || !usersData) {
+      setStatuses([]);
+      setStatusesLoading(false);
+      return;
+    }
+
+    const usersMap = new Map(usersData.map(u => [u.id, u]));
+    const statusesByUser = new Map<string, StatusUser>();
+
+    allStatuses.forEach(status => {
+      const storyAuthor = usersMap.get(status.userId);
+      if (!storyAuthor) return;
+
+      const story: StatusStory = { ...status, duration: 5000 };
+
+      if (statusesByUser.has(status.userId)) {
+        statusesByUser.get(status.userId)!.stories.push(story);
+      } else {
+        statusesByUser.set(status.userId, {
+          id: storyAuthor.id,
+          name: storyAuthor.name,
+          avatarUrl: storyAuthor.profilePictureUrl || `https://picsum.photos/seed/${storyAuthor.id}/200`,
+          stories: [story],
+        });
+      }
+    });
+
+    // Sort stories within each user group from oldest to newest
+    statusesByUser.forEach(user => {
+      user.stories.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+    });
+
+    setStatuses(Array.from(statusesByUser.values()));
+    setStatusesLoading(false);
+
+  }, [allStatuses, usersData, rawStatusesLoading, usersLoading]);
+
+  const fetchStatuses = useCallback(async () => {
+    // This function is kept for the AddStatusDialog to call for a refresh.
+    // The main loading is now handled by the useCollection hook and useEffect.
+  }, []);
+
 
   const handleSelectUser = useCallback((user: StatusUser) => {
     setActiveUser(user);
@@ -123,9 +129,13 @@ export default function StatusPage() {
       setActiveStoryIndex(prev => prev + 1);
     } else {
       const currentUserIndex = statuses.findIndex(u => u.id === activeUser.id);
-      const nextUser = statuses.find((u, index) => index > currentUserIndex);
-      if (nextUser) {
-        handleSelectUser(nextUser);
+      if (currentUserIndex < statuses.length - 1) {
+        const nextUser = statuses[currentUserIndex + 1];
+        if (nextUser) {
+          handleSelectUser(nextUser);
+        } else {
+          closeStatus();
+        }
       } else {
         closeStatus();
       }
@@ -180,12 +190,19 @@ export default function StatusPage() {
       setActiveStoryIndex(prev => prev - 1);
     } else {
        const currentUserIndex = statuses.findIndex(u => u.id === activeUser.id);
-       const prevUser = statuses.slice(0, currentUserIndex).reverse().find(u => u.id !== activeUser.id);
-       if (prevUser) {
-        handleSelectUser(prevUser);
-      } else {
-        closeStatus();
-      }
+       if (currentUserIndex > 0) {
+         const prevUser = statuses[currentUserIndex - 1];
+         if (prevUser) {
+           handleSelectUser(prevUser);
+         } else {
+           closeStatus();
+         }
+       } else {
+         // This is the first user, so just reset the current story
+         setActiveStoryIndex(0);
+         setProgress(0);
+         startTimer();
+       }
     }
   };
 
@@ -212,7 +229,7 @@ export default function StatusPage() {
             const snapshot = await uploadBytes(storageRef, file);
             const downloadURL = await getDownloadURL(snapshot.ref);
             
-            const statusCollectionRef = collection(firestore, 'users', user.uid, 'status_updates');
+            const statusCollectionRef = collection(firestore, 'status_updates');
             await addDocumentNonBlocking(statusCollectionRef, {
                 mediaUrl: downloadURL,
                 timestamp: serverTimestamp(),
@@ -222,7 +239,7 @@ export default function StatusPage() {
             
             toast({ title: "Status Added!", description: "Your new status is now live." });
             setIsAddStatusOpen(false);
-            fetchStatuses(); // Refresh statuses
+            // No need to call fetchStatuses, useCollection will update automatically
         } catch (error) {
             console.error("Status upload failed:", error);
             toast({ variant: "destructive", title: "Upload Failed", description: "Could not add your status." });
@@ -261,8 +278,8 @@ export default function StatusPage() {
   if (activeUser) {
       const activeStory = activeUser.stories[activeStoryIndex];
     return (
-        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onClick={closeStatus}>
-            <div className="relative w-full max-w-sm h-full max-h-[95vh] md:max-h-[80vh] aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onMouseDown={closeStatus} onTouchStart={closeStatus}>
+            <div className="relative w-full max-w-sm h-full max-h-[95vh] md:max-h-[80vh] aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl" onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
                 {isStoryLoading && <Skeleton className="absolute inset-0 w-full h-full animate-pulse" />}
                 {activeStory && <Image
                     src={activeStory.mediaUrl}
@@ -298,8 +315,8 @@ export default function StatusPage() {
                 </div>
 
                 {/* Navigation overlays */}
-                 <div className="absolute left-0 top-0 h-full w-1/3 z-10" onClick={handlePrevStory} />
-                 <div className="absolute right-0 top-0 h-full w-1/3 z-10" onClick={handleNextStory} />
+                 <div className="absolute left-0 top-0 h-full w-1/3 z-10" onMouseDown={handlePrevStory} onTouchEnd={handlePrevStory}/>
+                 <div className="absolute right-0 top-0 h-full w-1/3 z-10" onMouseDown={handleNextStory} onTouchEnd={handleNextStory}/>
             </div>
         </div>
     );
@@ -314,7 +331,7 @@ export default function StatusPage() {
         </Button>
       </div>
       <AddStatusDialog />
-      {(statusesLoading || usersLoading) ? (
+      {(statusesLoading) ? (
          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="relative aspect-[9/16] rounded-lg overflow-hidden">
@@ -350,7 +367,7 @@ export default function StatusPage() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
               <div className="absolute bottom-0 left-0 p-3 text-white">
-                <Avatar className={cn("w-10 h-10 mb-2 border-2", status.hasNew ? 'border-primary' : 'border-muted')}>
+                <Avatar className={cn("w-10 h-10 mb-2 border-2", 'border-primary')}>
                   <AvatarImage src={status.avatarUrl} />
                   <AvatarFallback>{status.name.charAt(0)}</AvatarFallback>
                 </Avatar>
@@ -363,5 +380,6 @@ export default function StatusPage() {
     </div>
   );
 }
+
 
     
