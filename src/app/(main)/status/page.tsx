@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import type { UserProfile } from "@/types";
 import { Card } from "@/components/ui/card";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { StatusViewersList } from "@/components/status-viewers-list";
 
 type StatusStory = {
   id: string;
@@ -59,6 +60,8 @@ export default function StatusPage() {
 
   const [statuses, setStatuses] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(true);
+
+  const [showViewers, setShowViewers] = useState(false);
   
   const twentyFourHoursAgo = useMemo(() => Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000), []);
   const statusUpdatesQuery = useMemoFirebase(() => query(
@@ -150,6 +153,7 @@ export default function StatusPage() {
 
   const closeStatus = useCallback(() => {
       setActiveUser(null);
+      setShowViewers(false);
   }, []);
 
   const handleNextStory = useCallback(() => {
@@ -306,6 +310,8 @@ export default function StatusPage() {
   if (activeUser) {
       const activeStory = activeUser.stories[activeStoryIndex];
       const isLiked = user ? activeStory?.likes.includes(user.uid) : false;
+      const isOwnStory = user?.uid === activeStory?.userId;
+
     return (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onMouseDown={closeStatus} onTouchStart={closeStatus}>
             <div className="relative w-full max-w-sm h-full max-h-[95vh] md:max-h-[80vh] aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl" onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
@@ -345,7 +351,10 @@ export default function StatusPage() {
                 
                  {activeStory && (
                     <div className="absolute bottom-4 left-4 z-20 flex items-center gap-4 text-white">
-                        <div className="flex items-center gap-1.5">
+                        <div 
+                         className={cn("flex items-center gap-1.5", isOwnStory && "cursor-pointer hover:opacity-80")}
+                         onClick={() => isOwnStory && setShowViewers(true)}
+                        >
                             <Eye className="w-5 h-5"/>
                             <span className="text-sm font-medium">{activeStory.views?.length || 0}</span>
                         </div>
@@ -356,7 +365,7 @@ export default function StatusPage() {
                     </div>
                  )}
 
-                {activeStory && user?.uid !== activeStory.userId && (
+                {activeStory && !isOwnStory && (
                     <div className="absolute bottom-4 right-4 z-20">
                         <Button
                             variant="ghost"
@@ -367,6 +376,15 @@ export default function StatusPage() {
                             <Heart className={cn("w-6 h-6 transition-all", isLiked ? "fill-red-500 text-red-500" : "")} />
                         </Button>
                     </div>
+                )}
+                
+                {isOwnStory && activeStory && (
+                  <StatusViewersList
+                    open={showViewers}
+                    onOpenChange={setShowViewers}
+                    viewerIds={activeStory.views}
+                    allUsers={usersData || []}
+                  />
                 )}
 
 
