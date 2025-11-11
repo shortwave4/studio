@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import type { UserProfile } from "@/types";
 import { Card } from "@/components/ui/card";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-import { StatusViewersList } from "@/components/status-viewers-list";
 
 type StatusStory = {
   id: string;
@@ -61,8 +60,6 @@ export default function StatusPage() {
   const [statuses, setStatuses] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(true);
 
-  const [showViewers, setShowViewers] = useState(false);
-  
   const twentyFourHoursAgo = useMemo(() => Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000), []);
   const statusUpdatesQuery = useMemoFirebase(() => query(
       collection(firestore, 'status_updates'), 
@@ -153,7 +150,6 @@ export default function StatusPage() {
 
   const closeStatus = useCallback(() => {
       setActiveUser(null);
-      setShowViewers(false);
   }, []);
 
   const handleNextStory = useCallback(() => {
@@ -352,8 +348,7 @@ export default function StatusPage() {
                  {activeStory && (
                     <div className="absolute bottom-4 left-4 z-20 flex items-center gap-4 text-white">
                         <div 
-                         className={cn("flex items-center gap-1.5", isOwnStory && "cursor-pointer hover:opacity-80")}
-                         onClick={() => isOwnStory && setShowViewers(true)}
+                         className={cn("flex items-center gap-1.5")}
                         >
                             <Eye className="w-5 h-5"/>
                             <span className="text-sm font-medium">{activeStory.views?.length || 0}</span>
@@ -378,16 +373,6 @@ export default function StatusPage() {
                     </div>
                 )}
                 
-                {isOwnStory && activeStory && (
-                  <StatusViewersList
-                    open={showViewers}
-                    onOpenChange={setShowViewers}
-                    viewerIds={activeStory.views}
-                    allUsers={usersData || []}
-                  />
-                )}
-
-
                  <div className="absolute left-0 top-0 h-full w-1/3 z-10" onMouseDown={handlePrevStory} onTouchEnd={handlePrevStory}/>
                  <div className="absolute right-0 top-0 h-full w-1/3 z-10" onMouseDown={handleNextStory} onTouchEnd={handleNextStory}/>
             </div>
@@ -477,5 +462,3 @@ export default function StatusPage() {
     </div>
   );
 }
-
-    
