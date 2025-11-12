@@ -1,5 +1,6 @@
-import { defaultCache } from "@serwist/next/worker";
+import { defaultCache, precacheAndRoute } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
+import { cleanupOutdatedCaches } from "serwist";
 
 declare global {
   interface SerwistWorkerGlobalScope extends SerwistGlobalConfig {
@@ -8,6 +9,10 @@ declare global {
 }
 
 declare const self: SerwistWorkerGlobalScope;
+
+cleanupOutdatedCaches();
+
+precacheAndRoute(self.__SW_MANIFEST || []);
 
 self.addEventListener("install", () => {
   self.skipWaiting();
